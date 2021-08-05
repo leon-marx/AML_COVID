@@ -9,5 +9,6 @@ class World():
 
 class Simulation():
     def __init__(self,N):
+        self.N = N
         pass
 
