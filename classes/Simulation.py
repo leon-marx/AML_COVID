@@ -1,14 +1,128 @@
-import numpy
+import numpy as np
 import matplotlib.pyplot as plt
+from numpy import random
 
 class World():
-    def __init__(self,N,D):
-        self.N = N
-        self.D = D
-        pass
+    '''
+    Read Me:
+    Modes one person can get in:
+        1: Infdividual is susceptible
+        2: Individual is infected
+        3: Indivisual is recoverd
+    initialization of the Network:
+        If self.Network[i,j] = 1, this indicates, that there is an connection between individual i and individual j
+        The sum over each row is degree D
+        Each individual is connected to each direct neighbor, meaning individual i is connected to individual i - 1 and i + 1. This corresponds to the circular structur shown in the paper
+    Note:
+        In this implementatio, it is possible, that a person can be infected by multiple persons in a single time step
+    '''
+    def __init__(self,N = 50,D = 8,r = 0.2,d = 14,N_init = 5):
+        self.N = N #Size of teh populatio
+        self.D = D #Degree, number of contact persons
+        self.r = r #Rate of passing th einfection to an susceptible neighbor with in one day
+        self.d = d #duration of the infection
+        self.N_init = N_init #Numbefr of persons infected at t = 0
 
-class Simulation():
-    def __init__(self,N):
-        self.N = N
-        pass
+        #initialize the population. This array cintains the infection state of each individual
+        self.P = np.ones(self.N)
 
+        #Get the initail infected persons randomly
+        indices = np.random.permutation(self.N)[:self.N_init]
+        self.P[indices] = np.ones(self.N_init) * 2
+
+        #initialize the social network
+        self.Network = np.zeros((self.N,self.N))
+
+        #Connect to the direct neighbors
+        for i in range(self.N):
+            self.Network[i][i-1] = 1
+            self.Network[i][(i+1) % self.N] = 1
+
+        #Connect randomly to another distant individual
+        for i in range(self.N):
+            if self.Network[i].sum() == self.D: continue
+
+            #Get the not connected individuals
+            mask_1 = (self.Network[i] == 0)
+            mask_1[i] = False
+
+            sums = self.Network.sum(-1)
+            mask_2 = (sums < self.D)
+
+            mask = mask_1 * mask_2
+            
+            possible_indices = np.arange(self.N)[mask]
+            diff = int(self.D - sums[i])
+            indices = possible_indices[np.random.permutation(len(possible_indices))][:min(diff,len(possible_indices))]
+
+            for u in indices:
+                self.Network[i][u] = 1
+                self.Network[u][i] = 1
+
+        #Counter how long a person has been infected
+        self.duration = np.zeros(self.N)
+
+    def __call__(self):
+        #This function performs an time step of the small world
+        #1) Update the number of infected days
+        self.duration[self.P == 2.0] += 1
+
+        #2) New infections 
+        #Which individual are suceptible
+        mask_susceptible = (self.P == 1)
+        
+        #which individuals are in a neighbourhood of an infected individual
+        #Get the infected persons
+        mask_infected = (self.P == 2)
+
+        #Only keep the relevant parts of th esocial network, meaning the contacts of teh infected persons
+        reduced_network = np.zeros((self.N,self.N))
+        reduced_network[mask_infected] = self.Network[mask_infected]
+
+        #print(reduced_network.sum(-1))
+
+        #Get a set of uniform random numbers to determin if a person would be infected or not
+        mask_probs = (np.random.uniform(0,1,(self.N,self.N)) <= self.r)
+
+        #combine the differnt masks
+        mask = mask_susceptible * reduced_network.astype(bool) * mask_probs
+
+        #Sum over the colums, to determine, if a suceptible is infected now
+        got_infected = np.where(mask.sum(0)>0,True,False)
+
+        #update the state of the infected individuaReturn elements chosen from x or y depending on condition.
+        self.P[got_infected] = 2
+
+        #Set the individuals to recoverd if the duation of the infection is over
+        self.P[(self.duration == self.d)] = 3
+
+        #return the total cumulative number of infected persons until the current time step
+        ill_recoverd = (self.P > 1).sum()
+
+        return ill_recoverd / self.N
+
+    def plotter(self,name):
+
+        r_x = 11
+        r_y = 11
+
+        phis = np.linspace(0,np.pi * 2,self.N+1)
+        x_individuals = r_x + np.sin(phis[:-1]) * 10
+        y_individuals = r_y + np.cos(phis[:-1]) * 10
+
+        plt.figure(figsize = (15,15))
+        plt.axis("off")
+
+        #draw the connections
+        for i in range(self.N):
+            for j in range(self.N):
+                if self.Network[i][j] == 1:
+                    plt.plot([x_individuals[i],x_individuals[j]],[y_individuals[i],y_individuals[j]],color = "gray")
+
+        #plot individuals
+        plt.plot(x_individuals[(self.P == 1)],y_individuals[(self.P == 1)],ls = "",marker = ".",ms = 50,color = "y",label  = "susceptible")
+        plt.plot(x_individuals[(self.P == 2)],y_individuals[(self.P == 2)],ls = "",marker = ".",ms = 50,color = "r",label  = "infected")
+        plt.plot(x_individuals[(self.P == 3)],y_individuals[(self.P == 3)],ls = "",marker = ".",ms = 50,color = "g",label  = "recoverd")
+
+        plt.savefig(name)
+        plt.close()
