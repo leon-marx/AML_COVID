@@ -1,6 +1,9 @@
-import numpy as np
 import matplotlib.pyplot as plt
-from numpy import random
+import numpy as np
+import torch
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# print("Device used: ",device)
 
 class World():
     '''
@@ -24,14 +27,14 @@ class World():
         self.N_init = N_init #Numbefr of persons infected at t = 0
 
         #initialize the population. This array cintains the infection state of each individual
-        self.P = np.ones(self.N)
+        self.P = torch.ones(self.N).to(device)
 
         #Get the initail infected persons randomly
-        indices = np.random.permutation(self.N)[:self.N_init]
-        self.P[indices] = np.ones(self.N_init) * 2
+        indices = torch.randperm(self.N)[:self.N_init].to(device)
+        self.P[indices] = torch.ones(self.N_init).to(device) * 2
 
         #initialize the social network
-        self.Network = np.zeros((self.N,self.N))
+        self.Network = torch.zeros((self.N,self.N)).to(device)
 
         #Connect to the direct neighbors
         for i in range(self.N):
@@ -40,6 +43,7 @@ class World():
 
         #Connect randomly to another distant individual
         for i in range(self.N):
+            # print(i)
             if self.Network[i].sum() == self.D: continue
 
             #Get the not connected individuals
@@ -51,16 +55,16 @@ class World():
 
             mask = mask_1 * mask_2
             
-            possible_indices = np.arange(self.N)[mask]
+            possible_indices = torch.arange(self.N).to(device)[mask]
             diff = int(self.D - sums[i])
-            indices = possible_indices[np.random.permutation(len(possible_indices))][:min(diff,len(possible_indices))]
+            indices = possible_indices[torch.randperm(len(possible_indices)).to(device)][:min(diff,len(possible_indices))]
 
             for u in indices:
                 self.Network[i][u] = 1
                 self.Network[u][i] = 1
 
         #Counter how long a person has been infected
-        self.duration = np.zeros(self.N)
+        self.duration = torch.zeros(self.N).to(device)
 
     def __call__(self):
         #This function performs an time step of the small world
@@ -76,19 +80,19 @@ class World():
         mask_infected = (self.P == 2)
 
         #Only keep the relevant parts of th esocial network, meaning the contacts of teh infected persons
-        reduced_network = np.zeros((self.N,self.N))
+        reduced_network = torch.zeros((self.N,self.N)).to(device)
         reduced_network[mask_infected] = self.Network[mask_infected]
 
         #print(reduced_network.sum(-1))
 
         #Get a set of uniform random numbers to determin if a person would be infected or not
-        mask_probs = (np.random.uniform(0,1,(self.N,self.N)) <= self.r)
+        mask_probs = (torch.rand((self.N,self.N)).to(device) <= self.r)
 
         #combine the differnt masks
-        mask = mask_susceptible * reduced_network.astype(bool) * mask_probs
+        mask = mask_susceptible * reduced_network.bool() * mask_probs
 
         #Sum over the colums, to determine, if a suceptible is infected now
-        got_infected = np.where(mask.sum(0)>0,True,False)
+        got_infected = torch.where(mask.sum(0) > 0, 1, 0).bool().to(device)
 
         #update the state of the infected individuaReturn elements chosen from x or y depending on condition.
         self.P[got_infected] = 2
@@ -106,9 +110,9 @@ class World():
         r_x = 11
         r_y = 11
 
-        phis = np.linspace(0,np.pi * 2,self.N+1)
-        x_individuals = r_x + np.sin(phis[:-1]) * 10
-        y_individuals = r_y + np.cos(phis[:-1]) * 10
+        phis = torch.linspace(0,np.pi * 2,self.N+1)
+        x_individuals = r_x + torch.sin(phis[:-1]) * 10
+        y_individuals = r_y + torch.cos(phis[:-1]) * 10
 
         plt.figure(figsize = (15,15))
         plt.axis("off")
@@ -126,3 +130,14 @@ class World():
 
         plt.savefig(name)
         plt.close()
+
+# W = World(N=1000, D=5, r=0.2, d=14, N_init=5)
+# print(W.Network)
+# W.plotter("plots/Initial.jpg")
+
+# cumulative = []
+# for i in range(50):
+    # print(i)
+    # if i % 1 == 0: W.plotter(f"plots/Step_{i}.jpg")
+    # cumulative.append(W().item())
+# print(cumulative)
