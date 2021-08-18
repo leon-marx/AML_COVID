@@ -16,8 +16,10 @@ Used for different evaluations of the simulation and the RNN
 - (LATER) Should take a given RNN and corresponding real data to assess and calibrate the the RNN.
 - (LATER) Should run the RNN on many different hyperparameters and compare to real data to find "real" hyperparameters.
 
-### (LATER) Implement first main function (Run_Simulation.py)
+### (LATER) Implement first main function (Run_Toy_Simulation.py)
 Should create Toy data and calibrate a Simulation on it.
+This means running a grid-search over the hyperparameters of the simulation and comparing, which set of hp's corresponds best to the well-known toy data.
+In a second step, we can then compare the real hp's with the predicted hp's, to see if the simulation works as expected.
 
 ### (LATER) Implement second main function (Run_RNN.py)
 Should use real data to calibrate a Simulation and train a RNN on the simulation in order to predict future infections and estimate the "real" hyperparameters of COVID-19.
