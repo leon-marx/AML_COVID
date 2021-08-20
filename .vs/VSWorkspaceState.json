@@ -1,8 +1,9 @@
 {
   "ExpandedNodes": [
     "",
-    "\\classes"
+    "\\classes",
+    "\\classes\\Countries"
   ],
-  "SelectedNode": "\\classes\\Simulation.py",
+  "SelectedNode": "\\classes\\RNN_Model.py",
   "PreviewInSolutionExplorer": false
 }
