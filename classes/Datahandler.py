@@ -114,7 +114,6 @@ class DataHandler():
         
         return running_averag
 
-
     def get_running_average(self,ts,dt):
         #Get the running average
         mean = np.mean(ts[:dt])
