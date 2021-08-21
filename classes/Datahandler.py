@@ -67,7 +67,7 @@ class DataHandler():
         return batch.view(L,B,1),starting_points
 
 
-
+'''
 params_simulation = {
     "D": 4,
     "N": 100,
@@ -106,3 +106,4 @@ for i in range(B):
     plt.plot(np.arange(starting_points[i],starting_points[i]+L),batch[:,i].detach().numpy(),ls = "",marker = "+")
 
 plt.show()
+'''
