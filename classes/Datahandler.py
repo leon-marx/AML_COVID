@@ -1,3 +1,4 @@
+from sys import version
 import torch
 import numpy as np
 from Simulation import World
@@ -19,7 +20,7 @@ class DataHandler():
 
         if mode == "Simulation":
             #initialize the small world network
-            W = World(N = params["N"], D = params["D"], r = params["r"], d = params["d"], N_init= params["N_init"])
+            W = World(N = params["N"], D = params["D"], r = params["r"], d = params["d"], N_init= params["N_init"],epsilon=params["epsilon"],version = params["version"])
 
             #Generate the full time series:
             self.cumulative = torch.zeros([params["T"]]).to(self.device)
@@ -133,13 +134,16 @@ class DataHandler():
 
 '''
 params_simulation = {
-    "D": 4,
-    "N": 100,
+    "D": 8,
+    "N": 1000,
     "r": 0.1,
     "d": 14,
-    "N_init": 5,
-    "T":50
-}
+    "N_init": 100,
+    "T":20,
+    "epsilon":0.1,
+    "version":"V2"
+} #version V2 is the one with random flipping
+
 params_real = {
     "file":"Israel.txt",
     "wave":4,
@@ -156,21 +160,23 @@ params_SIR = {
     "beta":1.3,
     "gamma":0.3
 }
-
-DH = DataHandler("SIR",params_SIR,device = "cpu")
-
 B = 2
 L = 9 
 
-batch,starting_points  = DH(B,L,return_plain=True)
-per_day = DH.get_per_day(batch)
+DH = DataHandler("Simulation",params_simulation,device = "cpu")
+batch1,starting_points  = DH(B,L,return_plain=True)
 
-plt.subplot(2,1,1)
-plt.plot(batch)
 
-plt.subplot(2,1,2)
-plt.plot(per_day)
+params_simulation["version"] = "V1"
+DH = DataHandler("Simulation",params_simulation,device = "cpu")
+batch2,starting_points  = DH(B,L,return_plain=True)
 
+plt.plot(batch1,label = "new")
+plt.plot(batch2,label = "old")
+
+plt.legend()
 plt.show()
 '''
+
+
 
