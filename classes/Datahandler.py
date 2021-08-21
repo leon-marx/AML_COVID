@@ -2,6 +2,7 @@ import torch
 import numpy as np
 from Simulation import World
 import matplotlib.pyplot as plt
+from Toydata import create_toydata
 
 class DataHandler():
     def __init__(self,mode,params,device):
@@ -24,7 +25,11 @@ class DataHandler():
                 self.cumulative[i] = W()
 
         elif mode == "Real":
-            self.cumulative = torch.tensor(np.loadtxt("./Countries/"+params["file"],skiprows=3)).to(device)
+            self.cumulative = torch.tensor(np.loadtxt("./Countries/"+params["file"],skiprows=4)).to(device)
+
+        elif mode == "SIR":
+            data = create_toydata(T = params["T"], I0= params["I0"], R0= params["R0"], N = params["N"], nu = params["nu"], beta = params["beta"],gamma = params["gamma"], mu = params["mu"])
+            self.cumulative = torch.tensor(data[:,2]).to(device)
 
         else:
             raise(NotImplementedError("Select valid data source!"))
@@ -48,7 +53,7 @@ class DataHandler():
         if return_plain: return self.cumulative.numpy()
         
         #Checck if the selected lenght of the slices is valid
-        if self.T < L: raise(ValueError("Selected sequence lenght exceeds lenght of time series"))
+        if self.T <= L: raise(ValueError("Selected sequence lenght exceeds lenght of time series"))
 
         #Get the batch
         batch = torch.zeros([L,B,1]).to(self.device)
@@ -74,6 +79,7 @@ params_simulation = {
 params_real = {
     "file":"Germany.txt"
 }
+
 params_SIR = {
     "T":10,
     "I0":1,
@@ -84,9 +90,11 @@ params_SIR = {
     "gamma":0.3,
     "mu":0.0001
 }
+
 DH = DataHandler("SIR",params_SIR,device = "cpu")
 B = 2
 L = 9 
+
 batch,starting_points  = DH(B,L)
 print(batch.shape)
 plt.plot(DH(B,L,return_plain=True))
