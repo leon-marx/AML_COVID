@@ -141,7 +141,6 @@ params_simulation = {
     "N_init": 5,
     "T":50
 }
-
 params_real = {
     "file":"Israel.txt",
     "wave":4,
@@ -166,6 +165,7 @@ DH = DataHandler("Real",params_real,device = "cpu")
 B = 2
 L = 9 
 
+<<<<<<< HEAD
 batch,starting_points  = DH(B,L,return_plain=True)
 per_day = DH.get_per_day(batch)
 
@@ -176,6 +176,13 @@ plt.subplot(2,1,2)
 plt.plot(per_day)
 
 
+=======
+batch,starting_points  = DH(B,L)
+print(batch.shape)
+plt.plot(DH(B,L,return_plain=True))
+for i in range(B):
+    plt.plot(np.arange(starting_points[i],starting_points[i]+L),batch[:,i].detach().numpy(),ls = "",marker = "+")
+>>>>>>> ebe0770031a588c1aa342272f08084366b8fe795
 plt.show()
 '''
 
