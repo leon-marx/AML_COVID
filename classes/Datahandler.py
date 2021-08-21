@@ -55,7 +55,7 @@ class DataHandler():
 
         elif mode == "SIR":
             data = create_toydata(T = params["T"], I0= params["I0"], R0= params["R0"], N = params["N"], beta = params["beta"],gamma = params["gamma"])
-            self.cumulative = torch.tensor(data[:,2]).to(device)
+            self.cumulative = torch.tensor(data[:,1:3].sum(-1)).to(device)
 
         else:
             raise(NotImplementedError("Select valid data source!"))
@@ -154,10 +154,8 @@ params_SIR = {
     "I0":1,
     "R0":0,
     "N":100,
-    "nu":0.001,
     "beta":1.3,
-    "gamma":0.3,
-    "mu":0.0001
+    "gamma":0.3
 }
 
 DH = DataHandler("SIR",params_SIR,device = "cpu")
@@ -173,7 +171,7 @@ plt.plot(batch)
 
 plt.subplot(2,1,2)
 plt.plot(per_day)
+
+plt.show()
 '''
-
-
 
