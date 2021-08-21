@@ -96,7 +96,7 @@ class RNN(nn.Module):
         return test_loss
 
 # Example use
-
+"""
 from Datahandler import DataHandler
 import os
 import matplotlib.pyplot as plt
@@ -144,3 +144,4 @@ plt.plot(np.arange(len(test_data)), test_data[:,0,...].view(-1), color="C0", lab
 plt.scatter(np.arange(len(pred))+len(test_data)+1, pred, color="C1", label="Prediction")
 plt.legend()
 plt.show()
+"""
