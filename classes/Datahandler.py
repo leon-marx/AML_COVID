@@ -76,7 +76,6 @@ params_simulation = {
     "N_init": 5,
     "T":50
 }
-
 params_real = {
     "file":"Germany.txt"
 }
@@ -97,13 +96,9 @@ B = 2
 L = 9 
 
 batch,starting_points  = DH(B,L)
-
 print(batch.shape)
-
 plt.plot(DH(B,L,return_plain=True))
-
 for i in range(B):
     plt.plot(np.arange(starting_points[i],starting_points[i]+L),batch[:,i].detach().numpy(),ls = "",marker = "+")
-
 plt.show()
 '''
