@@ -54,7 +54,7 @@ class DataHandler():
             self.cumulative = torch.tensor(self.cumulative).to(device)
 
         elif mode == "SIR":
-            data = create_toydata(T = params["T"], I0= params["I0"], R0= params["R0"], N = params["N"], nu = params["nu"], beta = params["beta"],gamma = params["gamma"], mu = params["mu"])
+            data = create_toydata(T = params["T"], I0= params["I0"], R0= params["R0"], N = params["N"], beta = params["beta"],gamma = params["gamma"])
             self.cumulative = torch.tensor(data[:,2]).to(device)
 
         else:
@@ -160,12 +160,11 @@ params_SIR = {
     "mu":0.0001
 }
 
-DH = DataHandler("Real",params_real,device = "cpu")
+DH = DataHandler("SIR",params_SIR,device = "cpu")
 
 B = 2
 L = 9 
 
-<<<<<<< HEAD
 batch,starting_points  = DH(B,L,return_plain=True)
 per_day = DH.get_per_day(batch)
 
@@ -174,15 +173,7 @@ plt.plot(batch)
 
 plt.subplot(2,1,2)
 plt.plot(per_day)
-
-
-=======
-batch,starting_points  = DH(B,L)
-print(batch.shape)
-plt.plot(DH(B,L,return_plain=True))
-for i in range(B):
-    plt.plot(np.arange(starting_points[i],starting_points[i]+L),batch[:,i].detach().numpy(),ls = "",marker = "+")
->>>>>>> ebe0770031a588c1aa342272f08084366b8fe795
-plt.show()
 '''
+
+
 
