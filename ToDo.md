@@ -20,6 +20,7 @@ Used for different evaluations of the simulation and the RNN
 Should create Toy data and calibrate a Simulation on it.
 This means running a grid-search over the hyperparameters of the simulation and comparing, which set of hp's corresponds best to the well-known toy data.
 In a second step, we can then compare the real hp's with the predicted hp's, to see if the simulation works as expected.
+Validate that parameters for SIR model and Simulation yield similar time series -> as SIR model is widely used, this should serve as justification for using the simulation model. 
 
 ### (LATER) Implement second main function (Run_RNN.py)
 Should use real data to calibrate a Simulation and train a RNN on the simulation in order to predict future infections and estimate the "real" hyperparameters of COVID-19.
