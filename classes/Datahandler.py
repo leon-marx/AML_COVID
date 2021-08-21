@@ -62,7 +62,7 @@ class DataHandler():
         return batch.view(L,B,1),starting_points
 
 
-"""
+'''
 params_simulation = {
     "D": 4,
     "N": 100,
@@ -71,22 +71,26 @@ params_simulation = {
     "N_init": 5,
     "T":50
 }
-
 params_real = {
     "file":"Germany.txt"
 }
-
-DH = DataHandler("Real",params_real,device = "cpu")
+params_SIR = {
+    "T":10,
+    "I0":1,
+    "R0":0,
+    "N":100,
+    "nu":0.001,
+    "beta":1.3,
+    "gamma":0.3,
+    "mu":0.0001
+}
+DH = DataHandler("SIR",params_SIR,device = "cpu")
 B = 2
-L = 10
+L = 9 
 batch,starting_points  = DH(B,L)
-
 print(batch.shape)
-
 plt.plot(DH(B,L,return_plain=True))
-
 for i in range(B):
     plt.plot(np.arange(starting_points[i],starting_points[i]+L),batch[:,i].detach().numpy(),ls = "",marker = "+")
-
 plt.show()
-"""
+'''
