@@ -1,6 +1,8 @@
 import torch
 from torch import nn
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
 class RNN(nn.Module):
     def __init__(self, input_size, hidden_size, output_size, num_layers, nonlinearity):
         """
@@ -35,7 +37,8 @@ class RNN(nn.Module):
         """
         if h_0 == None:
             N = sequence.shape[1]
-            h_0 = torch.zeros((self.num_layers, N, self.hidden_size))
+            h_0 = torch.zeros((self.num_layers, N, self.hidden_size)).to(device)
+        sequence = sequence.to(device)
         output, h_final = self.rnn(sequence, h_0)
         output = self.linear(output[-1]).view(1, N, self.input_size)
         return output
@@ -55,6 +58,7 @@ class RNN(nn.Module):
             if h_0 == None: initialize with zeros
         verbose: set True to print out the Training Loss
         """
+        training_data = training_data.to(device)
         X_data = training_data[:-self.output_size]
         y_data = training_data[-self.output_size:]
         self.train()
@@ -83,6 +87,7 @@ class RNN(nn.Module):
             hidden_size: as above, e.g. 256
             if h_0 == None: initialize with zeros
         """
+        test_data = test_data.to(device)
         X_data = test_data[:-self.output_size]
         y_data = test_data[-self.output_size:]
         test_loss = 0
@@ -97,24 +102,28 @@ class RNN(nn.Module):
 
 # Example use
 """
+print("Running on:", device)
+
 from Datahandler import DataHandler
+
+### Path problem, easy fix (only for me)
 import os
+# print(os.getcwd())
+os.chdir("./AML_COVID/classes")
+###
+
 import matplotlib.pyplot as plt
 import numpy as np
-os.chdir("C:/Users/gooog/Desktop/AML/final_project/repository/classes")
 DH = DataHandler(mode="Real", params={"file": "Germany.txt"}, device="cpu")
-N = 1  # batch size
+N = 500  # batch size
 L = 100  # sequence length
 data, starting_points  = DH(N,L)
-data = data.repeat(1, 100, 1)
-print(data.shape)
-# training_data = data[:70]
-# test_data = data[70:]
-training_data = data
-test_data = data
+print("Data:         ", data.shape)
+training_data = data[:,:350,...]
+test_data = data[:,350:,...]
 
-print(training_data.shape)
-print(test_data.shape)
+print("Training Data:", training_data.shape)
+print("Test Data:    ", test_data.shape)
 
 input_size = 1
 hidden_size = 256
@@ -123,10 +132,10 @@ num_layers = 2
 nonlinearity = "tanh"
 
 n_epochs = 1000
-learning_rate = 0.9
+learning_rate = 0.0001
 
 
-MyRNN = RNN(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, nonlinearity=nonlinearity)
+MyRNN = RNN(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, nonlinearity=nonlinearity).to(device)
 
 loss_fn = nn.MSELoss()
 optimizer = torch.optim.Adam(params=MyRNN.parameters(), lr=learning_rate)
@@ -136,12 +145,17 @@ for epoch in range(n_epochs):
     if epoch % 100 == 0:
         MyRNN.test_model(test_data=test_data, loss_fn=loss_fn)
 
-pred = MyRNN.forward(test_data)
-pred = pred.view(-1).detach().numpy()
-
-plt.figure()
-plt.plot(np.arange(len(test_data)), test_data[:,0,...].view(-1), color="C0", label="Training")
-plt.scatter(np.arange(len(pred))+len(test_data)+1, pred, color="C1", label="Prediction")
-plt.legend()
+plt.figure(figsize=(12, 12))
+for i in range(9):
+    plt.subplot(3, 3, i+1)
+    test_slice = test_data[:,i,...].view(L, 1, -1)
+    preds = []
+    outliers = []
+    pred_inds = []
+    outlier_inds = []
+    pred = MyRNN.forward(test_slice).to("cpu").view(-1).detach().numpy()
+    plt.plot(np.arange(L), test_slice.view(-1), color="C0", label="Test Set")
+    plt.scatter(L+1, pred, color="C1", label="Prediction")
+    plt.legend()
 plt.show()
 """
