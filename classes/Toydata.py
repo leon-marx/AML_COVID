@@ -18,9 +18,9 @@ def create_toydata(T, I0, R0, N, beta, gamma):
     def SIR_ode(y, t, N, beta, gamma):
         S, I, R = y
 
-        S_deriv = - beta * S * I / N
-        I_deriv = beta * S * I / N - gamma * I
-        R_deriv = gamma * I
+        S_deriv = - beta * S * I / N  # susceptible
+        I_deriv = beta * S * I / N - gamma * I  # infected
+        R_deriv = gamma * I  # recovered
 
         y_deriv = S_deriv, I_deriv, R_deriv
         return y_deriv
