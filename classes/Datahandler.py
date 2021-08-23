@@ -17,10 +17,12 @@ class DataHandler():
         '''
 
         self.device = device
+        self.mode = mode
 
         if mode == "Simulation":
             #initialize the small world network
             W = World(N = params["N"], D = params["D"], r = params["r"], d = params["d"], N_init= params["N_init"],epsilon=params["epsilon"],version = params["version"])
+            self.PP_data = torch.Tensor([params["N"], params["D"], params["r"], params["d"], params["epsilon"]])
 
             #Generate the full time series:
             self.cumulative = torch.zeros([params["T"]]).to(self.device)
@@ -91,8 +93,10 @@ class DataHandler():
         for i in range(B):
             batch[:,i,0] = self.cumulative[starting_points[i]:starting_points[i]+L]
 
-        return batch.view(L,B,1),starting_points
-
+        if self.mode == "Simulation":
+            return batch.view(L,B,1), starting_points, self.PP_data
+        else:
+            return batch.view(L,B,1), starting_points
     def get_per_day(self,ts,dt = 7):
         '''
         #Compute the running average of the per day infected individuals
