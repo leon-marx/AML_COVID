@@ -114,17 +114,17 @@ class World():
                 mask_possible = self.Network[i]
 
                 #Get a random selection to decide if a connectio is flipped
-                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0)
+                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(device)
 
                 #Get the connections that are flipped
                 mask = mask_original * mask_possible * mask_random
 
                 #store the old connections
-                old = torch.arange(self.N)[mask.numpy().astype(bool)]
+                old = torch.arange(self.N)[mask.bool()]
 
                 #FLip the selected connection to an individual that is not yet connected
                 #Get the indices of the people that are not yet connected
-                not_connected = np.arange(self.N)[self.Network[i] == 0.0]
+                not_connected = torch.arange(self.N)[self.Network[i] == 0.0]
 
                 #Not possible to flip to its self
                 not_connected = not_connected[not_connected != i]
