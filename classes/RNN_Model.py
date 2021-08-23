@@ -22,6 +22,7 @@ class RNN(nn.Module):
                           num_layers=num_layers,
                           nonlinearity=nonlinearity)
         self.linear = nn.Linear(in_features=hidden_size, out_features=output_size)
+        self.get_h0 = nn.Linear(in_features=5, out_features=num_layers * hidden_size)
 
     def forward(self, sequence, h_0=None):
         """
@@ -35,36 +36,40 @@ class RNN(nn.Module):
             hidden_size: as above, e.g. 256
             if h_0 == None: initialize with zeros
         """
+        N = sequence.shape[1]
         if h_0 == None:
-            N = sequence.shape[1]
             h_0 = torch.zeros((self.num_layers, N, self.hidden_size)).to(device)
         sequence = sequence.to(device)
         output, h_final = self.rnn(sequence, h_0)
         output = self.linear(output[-1]).view(1, N, self.input_size)
         return output
 
-    def train_model(self, training_data, loss_fn, optimizer, h_0=None, verbose=False):
+    def train_model(self, training_data, training_PP, loss_fn, optimizer, verbose=False):
         """
         training_data: should be a time series of shape (L, N, input_size) with:
             L: sequence length, e.g. 50 days
-            N: batch_size, generally 1
+            N: batch_size
             input_size: as above, generally 1
+        training_PP: pandemic parameters, tensor of shape (N, 4) with:
+            N: batch_size
+            4: the 4 different PP-values:
+                N_pop: population size
+                D: average degree of social network in population
+                r: daily transmission rate between two individuals which were in contact
+                d: duration of the infection
         loss_fn: use the loss functions provided by pytorch
         optimizer: use the optimizers provided by pytorch
-        h_0: optional, can specify initial hidden layer values with shape (num_layers, N, hidden_size) with:
-            num_layers: as above, generally 1
-            N: batch_size, generally 1
-            hidden_size: as above, e.g. 256
-            if h_0 == None: initialize with zeros
         verbose: set True to print out the Training Loss
         """
         training_data = training_data.to(device)
+        training_PP = training_PP.to(device)
         X_data = training_data[:-self.output_size]
         y_data = training_data[-self.output_size:]
         self.train()
 
         # Compute prediction error
-        pred = self.forward(X_data)
+        h_0 = self.get_h0(training_PP).view(self.num_layers, training_PP.shape[0], self.hidden_size)
+        pred = self.forward(X_data, h_0=h_0)
         loss = loss_fn(pred, y_data)
 
         # Backpropagation
@@ -74,56 +79,67 @@ class RNN(nn.Module):
         if verbose:
             print("Training Loss:", loss.item())
 
-    def test_model(self, test_data, loss_fn, h_0=None):
+    def test_model(self, test_data, test_PP, loss_fn):
         """
         test_data: should be a time series of shape (L, N, input_size) with:
             L: sequence length, e.g. 50 days
-            N: batch_size, generally 1
+            N: batch_size
             input_size: as above, generally 1
+        test_PP: pandemic parameters, tensor of shape (N, 4) with:
+            N: batch_size
+            4: the 4 different PP-values:
+                N_pop: population size
+                D: average degree of social network in population
+                r: daily transmission rate between two individuals which were in contact
+                d: duration of the infection
         loss_fn: use the loss functions provided by pytorch
-        h_0: optional, can specify initial hidden layer values with shape (num_layers, N, hidden_size) with:
-            num_layers: as above, generally 1
-            N: batch_size, generally 1
-            hidden_size: as above, e.g. 256
-            if h_0 == None: initialize with zeros
         """
         test_data = test_data.to(device)
+        test_PP = test_PP.to(device)
         X_data = test_data[:-self.output_size]
         y_data = test_data[-self.output_size:]
         test_loss = 0
         self.eval()
         with torch.no_grad():
             # Compute prediction error
-            pred = self.forward(X_data)
+            h_0 = self.get_h0(test_PP).view(self.num_layers, test_PP.shape[0], self.hidden_size)
+            pred = self.forward(X_data, h_0=h_0)
             test_loss += loss_fn(pred, y_data).item()
         test_loss /= test_data.shape[1]
         print("Average Test Loss:", test_loss)
         return test_loss
 
 # Example use
-"""
+
 print("Running on:", device)
 
 from Datahandler import DataHandler
 
-### Path problem, easy fix (only for me)
-import os
-# print(os.getcwd())
-os.chdir("./AML_COVID/classes")
-###
-
 import matplotlib.pyplot as plt
 import numpy as np
-DH = DataHandler(mode="Real", params={"file": "Germany.txt"}, device="cpu")
-N = 500  # batch size
-L = 100  # sequence length
-data, starting_points  = DH(N,L)
-print("Data:         ", data.shape)
+B = 500  # batch size
+L = 20  # sequence length
+params = {"N": 100,
+          "D": 5,
+          "r": 0.2,
+          "d": 14,
+          "N_init": 1,
+          "epsilon": 0.4,
+          "version": "V2",
+          "T": L + 1}
+DH = DataHandler(mode="Simulation", params=params, device=device)
+data, starting_points, PP_data  = DH(B,L)
+print("Data:            ", data.shape)
 training_data = data[:,:350,...]
 test_data = data[:,350:,...]
+print("Training Data:   ", training_data.shape)
+print("Test Data:       ", test_data.shape)
 
-print("Training Data:", training_data.shape)
-print("Test Data:    ", test_data.shape)
+print("PP Data:         ", PP_data.shape)
+PP_test_data = PP_data[350:,...]
+PP_training_data = PP_data[:350,...]
+print("PP Training Data:", PP_training_data.shape)
+print("PP Test Data:    ", PP_test_data.shape)
 
 input_size = 1
 hidden_size = 256
@@ -137,13 +153,20 @@ learning_rate = 0.0001
 
 MyRNN = RNN(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, nonlinearity=nonlinearity).to(device)
 
+# Print model and its parameters
+"""
+for name, param in MyRNN.named_parameters():
+    if param.requires_grad:
+        print(name, param.data)
+"""
+
 loss_fn = nn.MSELoss()
 optimizer = torch.optim.Adam(params=MyRNN.parameters(), lr=learning_rate)
 
 for epoch in range(n_epochs):
-    MyRNN.train_model(training_data=training_data, loss_fn=loss_fn, optimizer=optimizer)
+    MyRNN.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer)
     if epoch % 100 == 0:
-        MyRNN.test_model(test_data=test_data, loss_fn=loss_fn)
+        MyRNN.test_model(test_data=test_data, test_PP=PP_test_data, loss_fn=loss_fn)
 
 plt.figure(figsize=(12, 12))
 for i in range(9):
@@ -154,8 +177,7 @@ for i in range(9):
     pred_inds = []
     outlier_inds = []
     pred = MyRNN.forward(test_slice).to("cpu").view(-1).detach().numpy()
-    plt.plot(np.arange(L), test_slice.view(-1), color="C0", label="Test Set")
+    plt.plot(np.arange(L), test_slice.to("cpu").view(-1), color="C0", label="Test Set")
     plt.scatter(L+1, pred, color="C1", label="Prediction")
     plt.legend()
 plt.show()
-"""
