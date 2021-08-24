@@ -106,8 +106,7 @@ class RNN(nn.Module):
             # Compute prediction error
             h_0 = self.get_h0(test_PP).view(self.num_layers, test_PP.shape[0], self.hidden_size)
             pred = self.forward(X_data, h_0=h_0)
-            test_loss += loss_fn(pred, y_data).item()
-        test_loss /= test_data.shape[1]
+            test_loss = loss_fn(pred, y_data).item()
         print("Average Test Loss:", test_loss)
         return test_loss
 
