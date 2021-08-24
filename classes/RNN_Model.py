@@ -50,13 +50,14 @@ class RNN(nn.Module):
             L: sequence length, e.g. 50 days
             N: batch_size
             input_size: as above, generally 1
-        training_PP: pandemic parameters, tensor of shape (N, 4) with:
+        training_PP: pandemic parameters, tensor of shape (N, 5) with:
             N: batch_size
-            4: the 4 different PP-values:
+            5: the 5 different PP-values:
                 N_pop: population size
                 D: average degree of social network in population
                 r: daily transmission rate between two individuals which were in contact
                 d: duration of the infection
+                epsilon: rate of cross-contacts
         loss_fn: use the loss functions provided by pytorch
         optimizer: use the optimizers provided by pytorch
         verbose: set True to print out the Training Loss
@@ -85,13 +86,14 @@ class RNN(nn.Module):
             L: sequence length, e.g. 50 days
             N: batch_size
             input_size: as above, generally 1
-        test_PP: pandemic parameters, tensor of shape (N, 4) with:
+        test_PP: pandemic parameters, tensor of shape (N, 5) with:
             N: batch_size
-            4: the 4 different PP-values:
+            5: the 5 different PP-values:
                 N_pop: population size
                 D: average degree of social network in population
                 r: daily transmission rate between two individuals which were in contact
                 d: duration of the infection
+                epsilon: rate of cross-contacts
         loss_fn: use the loss functions provided by pytorch
         """
         test_data = test_data.to(device)
