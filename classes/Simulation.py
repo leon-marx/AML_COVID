@@ -145,8 +145,81 @@ class World():
                     self.Network[i][indices[u]] = 1
                     self.Network[indices[u]][i] = 1
 
-            #Counter how long a person has been infected
-            self.duration = torch.zeros(self.N).to(device)
+        elif version == "V3":
+            if N % 2 != 0: raise ValueError("select even populationsize!")
+
+            #sample the degrees from a poisson distribution with mean and variance D
+            D = np.random.poisson(lam = self.D, size=self.N)
+
+            self.D = D
+            self.r = r
+            self.e = epsilon
+            self.d = d
+            self.N_init = N_init
+            self.N = N
+
+            #initialize the population. This array cintains the infection state of each individual
+            self.P = torch.ones(self.N).to(device)
+
+            #Get the initial infected persons randomly
+            indices = torch.randperm(self.N)[:self.N_init].to(device)
+            self.P[indices] = torch.ones(self.N_init).to(device) * 2
+
+            #initialize the social network
+            self.Network = torch.zeros((self.N,self.N)).to(device)
+
+            #Connect to the D nearest neighbors
+            for i in range(self.N):
+                for j in range(1,int(D[i] // 2)+1):
+                    self.Network[i][i-j] = 1
+
+                for j in range(1,int(D[i] // 2) + 1):
+                    self.Network[i][(i+j) % self.N] = 1
+
+            mask_originally_connected = self.Network
+
+            #Flip close conections with a probability of e to an other individual
+            for i in range(self.N):
+                #only flip for the connections that are selected in the initial Network, select only individuals that are not connected in the original setting and that are not the individual itself
+                mask_original = torch.where(mask_originally_connected[i] != 0,1.0,0.0)
+                
+                #mask the entries for this individuum that are not zero, and can there for be flipped
+                mask_possible = self.Network[i]
+
+                #Get a random selection to decide if a connectio is flipped
+                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(device)
+
+                #Get the connections that are flipped
+                mask = mask_original * mask_possible * mask_random
+
+                #store the old connections
+                old = torch.arange(self.N)[mask.bool()]
+
+                #FLip the selected connection to an individual that is not yet connected
+                #Get the indices of the people that are not yet connected
+                not_connected = torch.arange(self.N)[self.Network[i] == 0.0]
+
+                #Not possible to flip to its self
+                not_connected = not_connected[not_connected != i]
+
+                #select as many of the not connected individuals as there are connections to flip
+                n_reconnect = int(mask.sum().item())
+
+                #select n_reconnect individuals
+                indices = torch.randperm(len(not_connected))[:n_reconnect]
+
+                #flip the connections
+                for u in range(len(indices)):
+                    #set the old entry to zero
+                    self.Network[i][old[u]] = 0
+                    self.Network[old[u]][i] = 0
+
+                    #Set the new connection
+                    self.Network[i][indices[u]] = 1
+                    self.Network[indices[u]][i] = 1
+
+        #Counter how long a person has been infected
+        self.duration = torch.zeros(self.N).to(device)
             
 
     def __call__(self):
@@ -213,17 +286,3 @@ class World():
 
         plt.savefig(name)
         plt.close()
-
-'''
-W = World(N=100, D=8, r=0.2, d=14, N_init=5,version = "V2")
-#print(W.Network)
-W.plotter("Initial_V2.jpg")
-
-plt.show()
-# cumulative = []
-# for i in range(50):
-    # print(i)
-    # if i % 1 == 0: W.plotter(f"plots/Step_{i}.jpg")
-    # cumulative.append(W().item())
-# print(cumulative)
-'''

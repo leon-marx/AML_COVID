@@ -136,14 +136,14 @@ class DataHandler():
 
         return running_averag
 
-'''
+
 params_simulation = {
     "D": 8,
     "N": 1000,
     "r": 0.1,
     "d": 14,
-    "N_init": 100,
-    "T":20,
+    "N_init": 5,
+    "T":30,
     "epsilon":0.1,
     "version":"V2"
 } #version V2 is the one with random flipping
@@ -167,20 +167,25 @@ params_SIR = {
 B = 2
 L = 9 
 
-DH = DataHandler("Simulation",params_simulation,device = "cpu")
-batch1,starting_points  = DH(B,L,return_plain=True)
-
+'''
 
 params_simulation["version"] = "V1"
 DH = DataHandler("Simulation",params_simulation,device = "cpu")
 batch2,starting_points  = DH(B,L,return_plain=True)
+plt.plot(batch2,label = "V1")
 
-plt.plot(batch1,label = "new")
-plt.plot(batch2,label = "old")
+params_simulation["version"] = "V2"
+DH = DataHandler("Simulation",params_simulation,device = "cpu")
+batch2,starting_points  = DH(B,L,return_plain=True)
+plt.plot(batch2,label = "V2")
+
+params_simulation["version"] = "V3"
+DH = DataHandler("Simulation",params_simulation,device = "cpu")
+batch2,starting_points  = DH(B,L,return_plain=True)
+plt.plot(batch2,label = "V3")
 
 plt.legend()
 plt.show()
+
+
 '''
-
-
-
