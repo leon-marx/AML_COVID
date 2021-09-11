@@ -48,6 +48,30 @@ class LSTM(nn.Module):
         output = self.linear(output[-1]).view(1, N, self.input_size)
         return output
 
+    def predict(self, sequence, PP_input):
+        """
+        sequence: should be a time series of shape (L, N, input_size) with:
+            L: sequence length, e.g. 50 days
+            N: batch_size, generally 1
+            input_size: as above, generally 1
+        PP_input: pandemic parameters, tensor of shape (N, 5) with:
+            N: batch_size
+            5: the 5 different PP-values:
+                N_pop: population size
+                D: average degree of social network in population
+                r: daily transmission rate between two individuals which were in contact
+                d: duration of the infection
+                epsilon: rate of cross-contacts
+        """
+        self.eval()
+        with torch.no_grad():
+            # Compute prediction error
+            h_0 = self.get_h0(PP_input).view(self.num_layers, PP_input.shape[0], self.hidden_size)
+            c_0 = self.get_c0(PP_input).view(self.num_layers, PP_input.shape[0], self.hidden_size)
+            pred = self.forward(sequence, inits=(h_0, c_0))
+        return pred
+
+
     def train_model(self, training_data, training_PP, loss_fn, optimizer, verbose=False):
         """
         training_data: should be a time series of shape (L, N, input_size) with:
@@ -152,7 +176,7 @@ input_size = 1
 hidden_size = 256
 output_size = 1
 num_layers = 2
-dropout = 0.1
+dropout = 0.5
 
 n_epochs = 1000
 learning_rate = 0.00003
@@ -161,26 +185,29 @@ learning_rate = 0.00003
 MyLSTM = LSTM(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, dropout=dropout).to(device)
 
 # Print model and its parameters
-
+"""
 for name, param in MyLSTM.named_parameters():
     if param.requires_grad:
         print(name)
+"""
 
 loss_fn = nn.MSELoss()
 optimizer = torch.optim.Adam(params=MyLSTM.parameters(), lr=learning_rate)
 
 for epoch in range(n_epochs):
-    MyLSTM.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer)
+    MyLSTM.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer, verbose=False)
     if epoch % 100 == 0:
         MyLSTM.test_model(test_data=test_data, test_PP=PP_test_data, loss_fn=loss_fn)
 
 plt.figure(figsize=(12, 12))
 for i in range(9):
     plt.subplot(3, 3, i+1)
-    test_slice = test_data[:,i,...].view(L, 1, -1)
-    MyLSTM.eval()
-    pred = MyLSTM.forward(test_slice).to("cpu").view(-1).detach().numpy()
-    plt.plot(np.arange(L), test_slice.to("cpu").view(-1), color="C0", label="Test Set")
-    plt.scatter(L+1, pred, color="C1", label="Prediction")
+    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
+    test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
+    PP_test_slice = PP_test_data[i,...].view(1, 5).to(device)
+    pred = MyLSTM.predict(test_slice_X, PP_test_slice).to("cpu").view(-1).detach().numpy()
+    plt.plot(np.arange(L-1), test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
+    plt.scatter(L, pred, color="C1", label="Prediction")
+    plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
     plt.legend()
 plt.show()
