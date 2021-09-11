@@ -3,47 +3,51 @@ from torch import nn
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
-class RNN(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size, num_layers, nonlinearity):
+class LSTM(nn.Module):
+    def __init__(self, input_size, hidden_size, output_size, num_layers, dropout):
         """
         input_size: number of features in input, generally 1
         hidden_size: number of hidden neurons, e.g. 256
         output_size: how many days to predict, generally 1
-        num_layers: number of stacked RNNs, generally 1
-        nonlinearity: choose "tanh" or "relu"
+        num_layers: number of stacked LSTMs, generally 1
+        dropout: dropout-probability, 0 corresponds to no dropout
         """
-        super(RNN, self).__init__()
+        super(LSTM, self).__init__()
         self.input_size = input_size
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_layers = num_layers
-        self.rnn = nn.RNN(input_size=input_size,
+        self.lstm = nn.LSTM(input_size=input_size,
                           hidden_size=hidden_size,
                           num_layers=num_layers,
-                          nonlinearity=nonlinearity)
+                          dropout=dropout)
         self.linear = nn.Linear(in_features=hidden_size, out_features=output_size)
         self.get_h0 = nn.Linear(in_features=5, out_features=num_layers * hidden_size)
+        self.get_c0 = nn.Linear(in_features=5, out_features=num_layers * hidden_size)
 
-    def forward(self, sequence, h_0=None):
+    def forward(self, sequence, inits=None):
         """
         sequence: should be a time series of shape (L, N, input_size) with:
             L: sequence length, e.g. 50 days
             N: batch_size, generally 1
             input_size: as above, generally 1
-        h_0: optional, can specify initial hidden layer values with shape (num_layers, N, hidden_size) with:
+        inits: optional, can specify initial hidden and cell layer values with shape (2, num_layers, N, hidden_size) with:
+            2: corresponds to (h0, c0)
             num_layers: as above, generally 1
             N: batch_size, generally 1
             hidden_size: as above, e.g. 256
             if h_0 == None: initialize with zeros
         """
         N = sequence.shape[1]
-        if h_0 == None:
+        if inits == None:
             h_0 = torch.zeros((self.num_layers, N, self.hidden_size)).to(device)
+            c_0 = torch.zeros((self.num_layers, N, self.hidden_size)).to(device)
+            inits = (h_0, c_0)
         sequence = sequence.to(device)
-        output, h_final = self.rnn(sequence, h_0)
+        output, (h_final, c_final) = self.lstm(sequence, inits)
         output = self.linear(output[-1]).view(1, N, self.input_size)
         return output
-        
+
     def predict(self, sequence, PP_input):
         """
         sequence: should be a time series of shape (L, N, input_size) with:
@@ -63,8 +67,10 @@ class RNN(nn.Module):
         with torch.no_grad():
             # Compute prediction error
             h_0 = self.get_h0(PP_input).view(self.num_layers, PP_input.shape[0], self.hidden_size)
-            pred = self.forward(sequence, h_0=h_0)
+            c_0 = self.get_c0(PP_input).view(self.num_layers, PP_input.shape[0], self.hidden_size)
+            pred = self.forward(sequence, inits=(h_0, c_0))
         return pred
+
 
     def train_model(self, training_data, training_PP, loss_fn, optimizer, verbose=False):
         """
@@ -92,7 +98,8 @@ class RNN(nn.Module):
 
         # Compute prediction error
         h_0 = self.get_h0(training_PP).view(self.num_layers, training_PP.shape[0], self.hidden_size)
-        pred = self.forward(X_data, h_0=h_0)
+        c_0 = self.get_c0(training_PP).view(self.num_layers, training_PP.shape[0], self.hidden_size)
+        pred = self.forward(X_data, inits=(h_0, c_0))
         loss = loss_fn(pred, y_data)
 
         # Backpropagation
@@ -127,7 +134,8 @@ class RNN(nn.Module):
         with torch.no_grad():
             # Compute prediction error
             h_0 = self.get_h0(test_PP).view(self.num_layers, test_PP.shape[0], self.hidden_size)
-            pred = self.forward(X_data, h_0=h_0)
+            c_0 = self.get_c0(test_PP).view(self.num_layers, test_PP.shape[0], self.hidden_size)
+            pred = self.forward(X_data, inits=(h_0, c_0))
             test_loss = loss_fn(pred, y_data).item()
         print("Average Test Loss:", test_loss)
         return test_loss
@@ -168,28 +176,28 @@ input_size = 1
 hidden_size = 256
 output_size = 1
 num_layers = 2
-nonlinearity = "tanh"
+dropout = 0.5
 
 n_epochs = 1000
-learning_rate = 0.0001
+learning_rate = 0.00003
 
 
-MyRNN = RNN(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, nonlinearity=nonlinearity).to(device)
+MyLSTM = LSTM(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, dropout=dropout).to(device)
 
 # Print model and its parameters
 """
-for name, param in MyRNN.named_parameters():
+for name, param in MyLSTM.named_parameters():
     if param.requires_grad:
-        print(name, param.data)
+        print(name)
 """
 
 loss_fn = nn.MSELoss()
-optimizer = torch.optim.Adam(params=MyRNN.parameters(), lr=learning_rate)
+optimizer = torch.optim.Adam(params=MyLSTM.parameters(), lr=learning_rate)
 
 for epoch in range(n_epochs):
-    MyRNN.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer)
+    MyLSTM.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer, verbose=False)
     if epoch % 100 == 0:
-        MyRNN.test_model(test_data=test_data, test_PP=PP_test_data, loss_fn=loss_fn)
+        MyLSTM.test_model(test_data=test_data, test_PP=PP_test_data, loss_fn=loss_fn)
 
 plt.figure(figsize=(12, 12))
 for i in range(9):
@@ -197,7 +205,7 @@ for i in range(9):
     test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
     test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
     PP_test_slice = PP_test_data[i,...].view(1, 5).to(device)
-    pred = MyRNN.predict(test_slice_X, PP_test_slice).to("cpu").view(-1).detach().numpy()
+    pred = MyLSTM.predict(test_slice_X, PP_test_slice).to("cpu").view(-1).detach().numpy()
     plt.plot(np.arange(L-1), test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
     plt.scatter(L, pred, color="C1", label="Prediction")
     plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
