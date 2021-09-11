@@ -13,23 +13,24 @@ class RNN(nn.Module):
         nonlinearity: choose "tanh" or "relu"
         """
         super(RNN, self).__init__()
-        self.input_size = input_size
+        self.input_size = input_size + 5
         self.hidden_size = hidden_size
         self.output_size = output_size
         self.num_layers = num_layers
-        self.rnn = nn.RNN(input_size=input_size,
-                          hidden_size=hidden_size,
-                          num_layers=num_layers,
-                          nonlinearity=nonlinearity)
-        self.linear = nn.Linear(in_features=hidden_size, out_features=output_size)
-        self.get_h0 = nn.Linear(in_features=5, out_features=num_layers * hidden_size)
+        self.nonlinearity = nonlinearity
+        self.rnn = nn.RNN(input_size=self.input_size,
+                          hidden_size=self.hidden_size,
+                          num_layers=self.num_layers,
+                          nonlinearity=self.nonlinearity)
+        self.linear = nn.Linear(in_features=self.hidden_size, out_features=self.output_size)
+        self.get_h0 = nn.Linear(in_features=5, out_features=self.num_layers * self.hidden_size)
 
     def forward(self, sequence, h_0=None):
         """
-        sequence: should be a time series of shape (L, N, input_size) with:
+        sequence: should be a time series of shape (L, N, input_PP_size) with:
             L: sequence length, e.g. 50 days
             N: batch_size, generally 1
-            input_size: as above, generally 1
+            input_PP_size: timeseries + PPs, generally 1 + 5 = 6
         h_0: optional, can specify initial hidden layer values with shape (num_layers, N, hidden_size) with:
             num_layers: as above, generally 1
             N: batch_size, generally 1
@@ -41,7 +42,7 @@ class RNN(nn.Module):
             h_0 = torch.zeros((self.num_layers, N, self.hidden_size)).to(device)
         sequence = sequence.to(device)
         output, h_final = self.rnn(sequence, h_0)
-        output = self.linear(output[-1]).view(1, N, self.input_size)
+        output = self.linear(output[-1]).view(1, N, self.output_size)
         return output
         
     def predict(self, sequence, PP_input):
@@ -50,7 +51,8 @@ class RNN(nn.Module):
             L: sequence length, e.g. 50 days
             N: batch_size, generally 1
             input_size: as above, generally 1
-        PP_input: pandemic parameters, tensor of shape (N, 5) with:
+        PP_input: pandemic parameters, tensor of shape (L, N, 5) with:
+            L: sequence length, e.g. 50 days
             N: batch_size
             5: the 5 different PP-values:
                 N_pop: population size
@@ -59,11 +61,12 @@ class RNN(nn.Module):
                 d: duration of the infection
                 epsilon: rate of cross-contacts
         """
+        PP_sequence = torch.cat((sequence, PP_input), dim=2)
         self.eval()
         with torch.no_grad():
             # Compute prediction error
-            h_0 = self.get_h0(PP_input).view(self.num_layers, PP_input.shape[0], self.hidden_size)
-            pred = self.forward(sequence, h_0=h_0)
+            h_0 = self.get_h0(PP_input[0]).view(self.num_layers, PP_input.shape[1], self.hidden_size)
+            pred = self.forward(PP_sequence, h_0=h_0)
         return pred
 
     def train_model(self, training_data, training_PP, loss_fn, optimizer, verbose=False):
@@ -72,7 +75,8 @@ class RNN(nn.Module):
             L: sequence length, e.g. 50 days
             N: batch_size
             input_size: as above, generally 1
-        training_PP: pandemic parameters, tensor of shape (N, 5) with:
+        training_PP: pandemic parameters, tensor of shape (L, N, 5) with:
+            L: sequence length, e.g. 50 days
             N: batch_size
             5: the 5 different PP-values:
                 N_pop: population size
@@ -88,11 +92,14 @@ class RNN(nn.Module):
         training_PP = training_PP.to(device)
         X_data = training_data[:-self.output_size]
         y_data = training_data[-self.output_size:]
+        X_PP = training_PP[:-self.output_size]
+        training_seq = torch.cat((X_data, X_PP), dim=2)
+        
         self.train()
 
         # Compute prediction error
-        h_0 = self.get_h0(training_PP).view(self.num_layers, training_PP.shape[0], self.hidden_size)
-        pred = self.forward(X_data, h_0=h_0)
+        h_0 = self.get_h0(X_PP[0]).view(self.num_layers, X_PP.shape[1], self.hidden_size)
+        pred = self.forward(training_seq, h_0=h_0)
         loss = loss_fn(pred, y_data)
 
         # Backpropagation
@@ -108,7 +115,8 @@ class RNN(nn.Module):
             L: sequence length, e.g. 50 days
             N: batch_size
             input_size: as above, generally 1
-        test_PP: pandemic parameters, tensor of shape (N, 5) with:
+        test_PP: pandemic parameters, tensor of shape (L, N, input_size) with:
+            L: sequence length, e.g. 50 days
             N: batch_size
             5: the 5 different PP-values:
                 N_pop: population size
@@ -122,12 +130,15 @@ class RNN(nn.Module):
         test_PP = test_PP.to(device)
         X_data = test_data[:-self.output_size]
         y_data = test_data[-self.output_size:]
+        X_PP = test_PP[:-self.output_size]
+        test_seq = torch.cat((X_data, X_PP), dim=2)
+
         test_loss = 0
         self.eval()
         with torch.no_grad():
             # Compute prediction error
-            h_0 = self.get_h0(test_PP).view(self.num_layers, test_PP.shape[0], self.hidden_size)
-            pred = self.forward(X_data, h_0=h_0)
+            h_0 = self.get_h0(X_PP[0]).view(self.num_layers, X_PP.shape[1], self.hidden_size)
+            pred = self.forward(test_seq, h_0=h_0)
             test_loss = loss_fn(pred, y_data).item()
         print("Average Test Loss:", test_loss)
         return test_loss
@@ -159,8 +170,8 @@ print("Training Data:   ", training_data.shape)
 print("Test Data:       ", test_data.shape)
 
 print("PP Data:         ", PP_data.shape)
-PP_test_data = PP_data[350:,...]
-PP_training_data = PP_data[:350,...]
+PP_training_data = PP_data[:,:350,...]
+PP_test_data = PP_data[:,350:,...]
 print("PP Training Data:", PP_training_data.shape)
 print("PP Test Data:    ", PP_test_data.shape)
 
@@ -196,7 +207,7 @@ for i in range(9):
     plt.subplot(3, 3, i+1)
     test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
     test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
-    PP_test_slice = PP_test_data[i,...].view(1, 5).to(device)
+    PP_test_slice = PP_test_data[:,i,...].view(L, 1, 5)[:L-1].to(device)
     pred = MyRNN.predict(test_slice_X, PP_test_slice).to("cpu").view(-1).detach().numpy()
     plt.plot(np.arange(L-1), test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
     plt.scatter(L, pred, color="C1", label="Prediction")

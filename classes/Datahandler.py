@@ -94,7 +94,7 @@ class DataHandler():
             batch[:,i,0] = self.cumulative[starting_points[i]:starting_points[i]+L]
 
         if self.mode == "Simulation":
-            return batch.view(L,B,1), starting_points, self.PP_data.repeat(B, 1)
+            return batch.view(L,B,1), starting_points, self.PP_data.repeat(L * B, 1).view(L, B, 5)
         else:
             return batch.view(L,B,1), starting_points
     def get_per_day(self,ts,dt = 7):
