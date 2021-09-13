@@ -6,22 +6,23 @@ import torch
 import numpy as np
 
 # Parameters for the simulation 
-N = 100 # population size (number of individuals) #= 100  
+N = 1000 # population size (number of individuals) #= 100  
 D = 8 # degree, number of contact persons
-r = 0.2 # rate of passing the infection
-d = 14 # duration of the infection
-N_init = 5 #number of persons infected at t_0; = 1 
+r = 0.1 # 0.2 # rate of passing the infection
+d = 6 #14 # duration of the infection
+epsilon = 0.1
+N_init = 10 #5 #number of persons infected at t_0; = 1 
 
 # Parameters for the SIR model 
-gamma = 1/d # death / recovery rate per day = 0.3
-beta = r * D / N # number of new infections for one first infected person per day = 1.3 
+gamma = 0.3 #1/d # death / recovery rate per day = 0.3
+beta = 1.3 #r * D / N # number of new infections for one first infected person per day = 1.3 
 R0 = 0 # initial number of recovered people
-I0 = 5 # corresponds to N_init 
+I0 = N_init # corresponds to N_init 
 
-T = 200 #number of days
+T = 100 #200 #number of days
 
 # Run the simulation 
-W = World(N = N, D = D, r = r,d = d, N_init = N_init)
+W = World(N = N, D = D, r = r,d = d, epsilon=epsilon, N_init = N_init)
 simulation = []
 for i in range(T):
     if i % 1 == 0: W.plotter(f"plots/Step_{i}.jpg")
