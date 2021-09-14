@@ -3,9 +3,11 @@ import matplotlib.pyplot as plt
 import numpy as np
 from numpy.lib.function_base import select
 import torch
+import time
+
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
-# print("Device used: ",device)
+print("Device used: ",device)
 
 class World():
     '''
@@ -223,6 +225,7 @@ class World():
             
 
     def __call__(self):
+        tic = time.perf_counter()
         #This function performs an time step of the small world
         #1) Update the number of infected days
         self.duration[self.P == 2.0] += 1
@@ -250,18 +253,20 @@ class World():
         #Sum over the colums, to determine, if a suceptible is infected now
         got_infected = torch.where(mask.sum(0) > 0, 1, 0).bool().to(device)
 
-        #update the state of the infected individuaReturn elements chosen from x or y depending on condition.
-        self.P[got_infected] = 2
-
+        #update the state of the infected Plotter
         #Set the individuals to recoverd if the duation of the infection is over
         self.P[(self.duration == self.d)] = 3
 
         #return the total cumulative number of infected persons until the current time step
         ill_recoverd = (self.P > 1).sum()
 
+        toc = time.perf_counter()
+        print(f"Simulate: {toc - tic:0.4f} seconds")
+
         return ill_recoverd / self.N
 
     def plotter(self,name):
+        tic = time.perf_counter()
 
         r_x = 11
         r_y = 11
@@ -286,3 +291,34 @@ class World():
 
         plt.savefig(name)
         plt.close()
+
+        toc = time.perf_counter()
+        print(f"Plotter: {toc - tic:0.4f} seconds")
+
+if __name__ == "__main__":
+
+    # Parameters for the simulation 
+    N = 10000 # population size (number of individuals) #= 100  
+    D = 8 # degree, number of contact persons
+    r = 0.1 # 0.2 # rate of passing the infection
+    d = 6 #14 # duration of the infection
+    epsilon = 0.1
+    N_init = 10 #5 #number of persons infected at t_0; = 1 
+    T = 100 #200 #number of days
+
+    # Run the simulation 
+    W = World(N = N, D = D, r = r,d = d, epsilon=epsilon, N_init = N_init)
+    simulation = []
+    for i in range(T):
+        if i % 5 == 0: W.plotter(f"plots/Step_{i}.jpg")
+        simulation.append(float(W())*N)
+    print(simulation)
+
+    # Plot the two series 
+    fig, ax = plt.subplots(1)
+    fig.suptitle('Simulation')
+    x = np.linspace(1, T, num=T)
+    ax.plot(x, simulation, label='Cumulative simulation')
+    plt.legend()
+    plt.savefig('plots/sim.jpg')
+    plt.close()
