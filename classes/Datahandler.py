@@ -176,7 +176,7 @@ class Sampler():
         params_simulation["T"] = self.T
 
         batch = torch.zeros([B*K,L]).to(self.device)
-        pandemic_parameters = torch.zeros([B*K,7]).to(self.device) #order: [[D,N,r,d,N_init,T,epsilon]]
+        pandemic_parameters = torch.zeros([B*K,5]).to(self.device) #order: (N, D, r, d, epsilon)
         starting_points = torch.zeros([B*K]).to(self.device)
 
         for i in range(K):
@@ -195,15 +195,15 @@ class Sampler():
             
             batch[i * B:(i+1) * B] = b.squeeze().T
 
-            pandemic_parameters[i * B:(i+1) * B] = torch.tensor([params_simulation["D"],params_simulation["N"],params_simulation["r"],params_simulation["d"],params_simulation["N_init"],params_simulation["T"],params_simulation["epsilon"]])[None,:]
+            pandemic_parameters[i * B:(i+1) * B] = torch.tensor([params_simulation["N"], params_simulation["D"],params_simulation["r"],params_simulation["d"],params_simulation["epsilon"]])[None,:]
             starting_points[i * B : (i+1) * B] = torch.tensor(sp)
-            print(sp)
+            # print(sp)
 
         #Shuffle the batch
         indices = np.random.permutation(B * K)
 
         batch = batch[indices].to(self.device)
-        pandemic_parameters = pandemic_parameters[indices].to(self.device)
+        pandemic_parameters = pandemic_parameters[indices].repeat(L, 1, 1).to(self.device)
         starting_points = starting_points[indices].to(self.device)
 
         #reshape the batch 
@@ -216,6 +216,7 @@ class Sampler():
 #####################################################################################
 #Example sampler
 #####################################################################################
+"""
 lower_lims = {
     "D":1,
     "r":0.0,
@@ -307,3 +308,4 @@ plt.show()
 
 
 '''
+"""

@@ -144,7 +144,7 @@ class RNN(nn.Module):
         return test_loss
 
 # Example use
-
+"""
 print("Running on:", device)
 
 from Datahandler import DataHandler
@@ -188,11 +188,11 @@ learning_rate = 0.0001
 MyRNN = RNN(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, nonlinearity=nonlinearity).to(device)
 
 # Print model and its parameters
-"""
+
 for name, param in MyRNN.named_parameters():
     if param.requires_grad:
         print(name, param.data)
-"""
+
 
 loss_fn = nn.MSELoss()
 optimizer = torch.optim.Adam(params=MyRNN.parameters(), lr=learning_rate)
@@ -214,3 +214,4 @@ for i in range(9):
     plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
     plt.legend()
 plt.show()
+"""
