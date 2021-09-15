@@ -1,3 +1,4 @@
+from torch._C import parse_schema
 from Datahandler import DataHandler
 import matplotlib.pyplot as plt
 import sobol_seq
@@ -5,24 +6,22 @@ import numpy as np
 import GPy
 import scipy
 import optunity
+import itertools
+from operator import itemgetter
+import torch 
 
 class GridSearch_PP_finder():
-    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1]),upper_lims = np.array([0.5,15,0.25,10]),N_pop = 5000,version = "V3",device = "cpu",iterations = 120):
+    def __init__(self, pp_grid, N_pop = 1000,version = "V3",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120):
         '''
         parameters:
+            pp_grid                 grid for pp search space 
             params_real             Paramters describing the real time series
-            N_initial_PP_samples    Number of samples used to initialize the gp
-            lower_lims              Lower limits of the initial pandemic parameters [epsilon,degree,infection_rate,N_init]
-            upper_lims              Upper limits of the initial pandemic parameters [epsilon,degree,infection_rate,N_init]
             N_pop                   Number of individuals in the small world model
             version                 Version of the Small world model                
             device                  Device
             iterations              Number of iterations to find the optimal pandemic parameters
         '''
-        self.N_initial_PP_samples = N_initial_PP_samples
-        self.lower_lims = lower_lims
-        self.upper_lims = upper_lims
-        self.N_pop = N_pop
+        self.pp_grid = pp_grid
         self.version = version
         self.device = device
         self.iterations = iterations
@@ -30,8 +29,14 @@ class GridSearch_PP_finder():
         self.simulation_parameters = {
             "N":N_pop,
             "d":14,
-            "version":"V3"
+            "version":"V2" #TODO V3
         }
+
+        # Print number of combinations 
+        com = 1
+        for x in self.pp_grid.values():
+            com *= len(x)
+        print(f"Number of combinations: {com}")
 
     def cost(self,ts_1,ts_2):
         '''
@@ -77,100 +82,71 @@ class GridSearch_PP_finder():
 
         return ts
 
-    def __call__(self,params_real):
+    def __call__(self,params_real, max_evals=200):
+
         #Get the real time series
-        ts_real = self.get_time_series("Real",params_real,device = "cpu")
+        ts_real = self.get_time_series("Real", params_real,device = "cpu")
  
         #Get the number of the time steps
         T = len(ts_real)
-        
-        
-        #Sample the initial pandemic parameters from a sobol sequnce
-        pandemic_parammeters = np.zeros([self.N_initial_PP_samples,4])
-        costs = np.zeros(self.N_initial_PP_samples)
 
-        #print("\tGet the initial samples for the GP...")
+        # try all pp combinations
+        keys, values = zip(*self.pp_grid.items())
+        i = 0
+        results = list()
 
-        '''
-        for i in range(self.N_initial_PP_samples):
-            epsilon,D,r,N_init = sobol_seq.i4_sobol(4,i)[0] * (self.upper_lims - self.lower_lims) + self.lower_lims
+        for v in itertools.product(*values):
 
-            pandemic_parammeters[i] = np.array([epsilon,int(D),r,int(N_init)])
-
-            #Get the simulation for the corresponding pandemic parameters
-            self.simulation_parameters["D"] = int(D)
-            self.simulation_parameters["r"] = r
-            self.simulation_parameters["N_init"] = int(N_init)
-            self.simulation_parameters["T"] = T
-            self.simulation_parameters["epsilon"] = epsilon
+            # Parse pp
+            pp = dict(zip(keys, v))
+            self.simulation_parameters['D'] = pp['D']
+            self.simulation_parameters['r'] = pp['r']
+            self.simulation_parameters['N_init'] = pp['N_init']
+            self.simulation_parameters['T'] = T
+            self.simulation_parameters['epsilon'] = pp['epsilon']
 
             #Get the simulated time series
-            ts_simulation = self.get_time_series("Simulation",self.simulation_parameters,device = "cpu")
+            ts_simulation = self.get_time_series("Simulation", self.simulation_parameters,device = "cpu")
 
             #Get the mse between the simulation and the real time series
             mse = self.cost(ts_real,ts_simulation)
-            costs[i] = mse
+            print(f"PP: {pp} | MSE = {mse}")
 
-            print("\t\t i = ",i,"\tMSE = ",mse)
+            #Append 
+            results.append([pp,mse])
 
-        costs = costs.reshape(-1,1)
-        print("\n")
+            # Break if max_eval
+            if i > max_evals:
+                break
+        
 
-        print("\tFinding optimal pp...")
-        for j in range(self.iterations):
-
-            lims = {"x1":[self.lower_lims[0],self.upper_lims[0]],"x2":[self.lower_lims[1],self.upper_lims[1]],"x3":[self.lower_lims[2],self.upper_lims[2]],"x4":[self.lower_lims[3],self.upper_lims[3]],}
-            q_opt, _,_ = optunity.maximize(func,num_evals = 1000,**lims)
-
-            #Get the time series for the new proposal parameters
-            self.simulation_parameters["D"] = int(q_opt["x2"])
-            self.simulation_parameters["r"] = q_opt["x3"]
-            self.simulation_parameters["N_init"] = int(q_opt["x4"])
-            self.simulation_parameters["epsilon"] = q_opt["x1"]
-
-            #Get the simulated time series
-            ts_simulation = self.get_time_series("Simulation",self.simulation_parameters,device = "cpu")
-
-            #Get the mse
-            mse = self.cost(ts_real,ts_simulation).reshape(-1,1)
-            
-            #Add to the training set
-            costs = np.concatenate((costs,mse),axis = 0)
-            pandemic_parammeters = np.concatenate((pandemic_parammeters,np.array([q_opt["x1"],int(q_opt["x2"]),q_opt["x3"],int(q_opt["x4"])]).reshape(-1,4)),axis = 0)
-
-
-            print("\t\t i = ",j,"\tMSE = ",mse[0][0],"\t",len(pandemic_parammeters))
-        '''
+        # Sort by mse-loss
+        results.sort(key=itemgetter(1), reverse=True)
 
         #Get the best parameters
-        index = np.argmin(costs.reshape(-1))
-        optimal_pp = pandemic_parammeters[index]
+        mse_list = [results[i][1] for i in range(len(results))] 
+        index = np.argmin(mse_list)
+        optimal_pp = results[index][0]
 
-        print("\n\toptimal parameters: ",optimal_pp)
-
-        #plot the real data
-        plt.plot(ts_real,label = "real observed time series")
-
-        #plot the best fitting simulation
-        #Get the time series for the new proposal parameters
-        self.simulation_parameters["D"] = int(optimal_pp[1])
-        self.simulation_parameters["r"] = optimal_pp[2]
-        self.simulation_parameters["N_init"] = int(optimal_pp[3])
-        self.simulation_parameters["epsilon"] = optimal_pp[0]
-
+        #Get the time series for the best parameters
+        self.simulation_parameters["D"] = int(optimal_pp['D'])
+        self.simulation_parameters["r"] = optimal_pp['r']
+        self.simulation_parameters["N_init"] = int(optimal_pp['N_init'])
+        self.simulation_parameters["epsilon"] = optimal_pp['epsilon']
         ts_optimal = self.get_time_series("Simulation",self.simulation_parameters,device = "cpu")
-
+        
+        #plot the best fitting simulation with observed data 
         plt.figure(figsize=(20,10))
         plt.plot(ts_optimal,label = "simulation")
         plt.plot(ts_real,label = "observation")
         country = params_real["file"].split(".")[0]
         plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}")
-
         plt.legend()
-        plt.savefig(f"./Images_GP_fit/{country}_{params_real['wave']}.jpg")
+        plt.savefig(f"./plots/GS_fit_{country}_{params_real['wave']}.jpg")
         plt.close()
 
 if __name__ == "__main__": 
+    
     params_real = {
         "file":"Israel.txt",
         "wave":3,
@@ -179,5 +155,13 @@ if __name__ == "__main__":
         "dt_running_average":14
     }
 
-    gs = GridSearch_PP_finder(N_initial_PP_samples = 50,iterations = 100)
+    pp_grid = {
+        "epsilon": [0.1],
+        "D": [5,10], #list(np.linspace(5,10,6)),
+        "r": [0.05], #list(np.linspace(0.05,0.2,4)),
+        "d": [5], #list(np.linspace(5,10,6)),
+        "N_init": [5,10,15]
+    }
+
+    gs = GridSearch_PP_finder(pp_grid=pp_grid, iterations = 100)
     gs(params_real)
