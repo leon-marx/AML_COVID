@@ -68,8 +68,8 @@ print("Generating Data")
 batch, pandemic_parameters, starting_points = mysampler(K, L, B)
 training_data = batch[:,:-test_batch_size,...]
 test_data = batch[:,-test_batch_size:,...]
-training_PP = pandemic_parameters[:,:-4,...]
-test_PP = pandemic_parameters[:,-4:,...]
+training_PP = pandemic_parameters[:,:-test_batch_size,...]
+test_PP = pandemic_parameters[:,-test_batch_size:,...]
 
 # RNN Training
 print("Training RNN")
