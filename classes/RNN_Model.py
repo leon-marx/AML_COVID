@@ -69,6 +69,37 @@ class RNN(nn.Module):
             pred = self.forward(PP_sequence, h_0=h_0)
         return pred
 
+    def predict_long(self, sequence, PP_input, n_days):
+        """
+        sequence: should be a time series of shape (L, N, input_size) with:
+            L: sequence length, e.g. 50 days
+            N: batch_size, generally 1
+            input_size: as above, generally 1
+        PP_input: pandemic parameters, tensor of shape (L, N, 5) with:
+            L: sequence length, e.g. 50 days
+            N: batch_size
+            5: the 5 different PP-values:
+                N_pop: population size
+                D: average degree of social network in population
+                r: daily transmission rate between two individuals which were in contact
+                d: duration of the infection
+                epsilon: rate of cross-contacts
+        n_days: number of days to predict in the future
+        """
+        preds = []
+        L = sequence.shape[0]
+        for i in range(n_days):
+            PP_sequence = torch.cat((sequence, PP_input), dim=2)
+            self.eval()
+            with torch.no_grad():
+                # Compute prediction error
+                h_0 = self.get_h0(PP_input[0]).view(self.num_layers, PP_input.shape[1], self.hidden_size)
+                pred = self.forward(PP_sequence, h_0=h_0)
+                preds.append(pred)
+                sequence = torch.cat((sequence, pred), dim=0)[-n_days:]
+                PP_input = torch.cat((PP_input, PP_input[-1].view(1, -1, 5)), dim=0)[-n_days:]
+        return torch.Tensor(preds)
+
     def train_model(self, training_data, training_PP, loss_fn, optimizer, verbose=False):
         """
         training_data: should be a time series of shape (L, N, input_size) with:

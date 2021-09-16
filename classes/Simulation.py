@@ -254,6 +254,8 @@ class World():
         got_infected = torch.where(mask.sum(0) > 0, 1, 0).bool().to(device)
 
         #update the state of the infected Plotter
+        self.P[got_infected] = 2
+            
         #Set the individuals to recoverd if the duation of the infection is over
         self.P[(self.duration == self.d)] = 3
 
@@ -261,7 +263,7 @@ class World():
         ill_recoverd = (self.P > 1).sum()
 
         toc = time.perf_counter()
-        print(f"Simulate: {toc - tic:0.4f} seconds")
+        # print(f"Simulate: {toc - tic:0.4f} seconds")
 
         return ill_recoverd / self.N
 
@@ -293,7 +295,7 @@ class World():
         plt.close()
 
         toc = time.perf_counter()
-        print(f"Plotter: {toc - tic:0.4f} seconds")
+        # print(f"Plotter: {toc - tic:0.4f} seconds")
 
 if __name__ == "__main__":
 
@@ -312,7 +314,7 @@ if __name__ == "__main__":
     for i in range(T):
         if i % 5 == 0: W.plotter(f"plots/Step_{i}.jpg")
         simulation.append(float(W())*N)
-    print(simulation)
+    # print(simulation)
 
     # Plot the two series 
     fig, ax = plt.subplots(1)

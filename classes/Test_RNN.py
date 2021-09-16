@@ -41,6 +41,7 @@ B = 10  # number of slices per simulation
 n_epochs = 10000
 learning_rate = 0.0001
 test_batch_size = 4
+n_days = 10  # number of days to predict for long predictions
 
 # Models
 print("Initializing Models")
@@ -71,6 +72,19 @@ test_data = batch[:,-test_batch_size:,...]
 training_PP = pandemic_parameters[:,:-test_batch_size,...]
 test_PP = pandemic_parameters[:,-test_batch_size:,...]
 
+# Ckeck Data Quality
+x = np.arange(L-1)
+plt.figure(figsize=(12, 8))
+for i in range(test_batch_size):
+    plt.subplot(2, 2, i+1)
+    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
+    test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
+    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:L-1].to(device)
+    plt.plot(x, test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
+    plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.legend()
+plt.show()
+
 # RNN Training
 print("Training RNN")
 myrnn.to(device)
@@ -100,6 +114,23 @@ for i in range(test_batch_size):
 plt.savefig("RNN_Predictions.png")
 # plt.show()
 
+# Plotting Long RNN Predictions
+print("Plotting Long RNN Predictions")
+x = np.arange(L-1)
+plt.figure(figsize=(12, 8))
+for i in range(test_batch_size):
+    plt.subplot(2, 2, i+1)
+    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
+    test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
+    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:L-1].to(device)
+    preds = myrnn.predict_long(test_slice_X, PP_test_slice, n_days=n_days).to("cpu").view(-1).detach().numpy()
+    plt.plot(x, test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
+    plt.scatter(torch.arange(L, L+n_days), preds, color="C1", label="Prediction")
+    plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.legend()
+plt.savefig("RNN_Long_Predictions.png")
+# plt.show()
+
 # LSTM Training
 print("Training LSTM")
 mylstm.to(device)
@@ -127,4 +158,21 @@ for i in range(test_batch_size):
     plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
     plt.legend()
 plt.savefig("LSTM_Predictions.png")
+# plt.show()
+
+# Plotting Long LSTM Predictions
+print("Plotting Long LSTM Predictions")
+x = np.arange(L-1)
+plt.figure(figsize=(12, 8))
+for i in range(test_batch_size):
+    plt.subplot(2, 2, i+1)
+    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
+    test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
+    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:L-1].to(device)
+    preds = mylstm.predict_long(test_slice_X, PP_test_slice, n_days=n_days).to("cpu").view(-1).detach().numpy()
+    plt.plot(x, test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
+    plt.scatter(torch.arange(L, L+n_days), preds, color="C1", label="Prediction")
+    plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.legend()
+plt.savefig("LSTM_Long_Predictions.png")
 # plt.show()
