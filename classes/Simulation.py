@@ -254,6 +254,8 @@ class World():
         got_infected = torch.where(mask.sum(0) > 0, 1, 0).bool().to(device)
 
         #update the state of the infected Plotter
+        self.P[got_infected] = 2
+            
         #Set the individuals to recoverd if the duation of the infection is over
         self.P[(self.duration == self.d)] = 3
 
