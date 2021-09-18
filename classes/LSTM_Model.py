@@ -111,7 +111,7 @@ class LSTM(nn.Module):
                 #TODO append prediction for PP_input or do they remain the same?
         return torch.Tensor(preds)
 
-    def train_model(self, training_data, training_PP, loss_fn, optimizer, verbose=False):
+    def train_model(self, training_data, training_PP, loss_fn, optimizer, epoch, verbose=False):
         """
         Implements one training step for a given time-series
         training_data: should be a time series of shape (L, N, input_size) with:
@@ -155,7 +155,7 @@ class LSTM(nn.Module):
         loss.backward()
         optimizer.step()
         if verbose:
-            print("Training Loss:", loss.item())
+            print(f"Epoch: {epoch} | Training Loss:", loss.item())
 
     def test_model(self, test_data, test_PP, loss_fn):
         """
@@ -290,10 +290,10 @@ if __name__ == "__main__":
     num_layers = 2
     dropout = 0.5
 
-    n_epochs = 2
+    n_epochs = 200
     learning_rate = 0.0001
 
-    n_days = 10
+    n_days = 5
 
 
     MyLSTM = LSTM(input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, dropout=dropout).to(device)
@@ -309,8 +309,8 @@ if __name__ == "__main__":
     optimizer = torch.optim.Adam(params=MyLSTM.parameters(), lr=learning_rate)
 
     for epoch in range(n_epochs):
-        MyLSTM.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer, verbose=False)
-        if epoch % 100 == 0:
+        MyLSTM.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer, verbose=True, epoch=epoch)
+        if epoch % 20 == 0:
             MyLSTM.test_model(test_data=test_data, test_PP=PP_test_data, loss_fn=loss_fn)
 
     # get correct samples 
