@@ -71,7 +71,7 @@ class World():
             #Counter how long a person has been infected
             self.duration = torch.zeros(self.N).to(device)
 
-        elif version == "V2":
+        elif version == "V2_old":
             if N % 2 != 0: raise ValueError("select even populationsize!")
             #Fixed average degree
             self.D = D
@@ -99,12 +99,14 @@ class World():
                 for j in range(1,int(D // 2) + 1):
                     self.Network[i][(i+j) % self.N] = 1
 
-            mask_originally_connected = self.Network
-
             #Handle the case that D is odd
             if D % 2 != 0:
                 for i in range(self.N):
                     self.Network[i][(i+int(D // 2) +1 )%self.N] = 1
+            
+            mask_originally_connected = self.Network
+
+            #print(self.Network,"\n")
 
 
             #Flip close conections with a probability of e to an other individual
@@ -146,6 +148,88 @@ class World():
                     #Set the new connection
                     self.Network[i][indices[u]] = 1
                     self.Network[indices[u]][i] = 1
+        
+        elif version == "V2":
+            if N % 2 != 0: raise ValueError("select even populationsize!")
+            #Fixed average degree
+            self.D = D
+            self.r = r
+            self.e = epsilon
+            self.d = d
+            self.N_init = N_init
+            self.N = N
+
+            #initialize the population. This array cintains the infection state of each individual
+            self.P = torch.ones(self.N).to(device)
+
+            #Get the initail infected persons randomly
+            indices = torch.randperm(self.N)[:self.N_init].to(device)
+            self.P[indices] = torch.ones(self.N_init).to(device) * 2
+
+            #initialize the social network
+            self.Network = torch.zeros((self.N,self.N)).to(device)
+            self.Network[-(int(D // 2) +1):,:(int(D // 2) +1)] = torch.tril(torch.ones([(int(D // 2) +1),(int(D // 2) +1)]))
+            self.Network[:int(D // 2),-int(D // 2):] = torch.tril(torch.ones([int(D // 2),int(D // 2)]))
+
+            #Connect to the D nearest neighbors
+            for i in range(1,int(D // 2)+1):
+                self.Network += torch.Tensor(np.eye(N,k=i))
+                self.Network += torch.Tensor(np.eye(N,k=-i))
+
+            #Handle the case that D is odd
+            if D % 2 != 0:
+                self.Network += torch.Tensor(np.eye(N,k=int(D // 2)+1))
+
+            mask_originally_connected = self.Network
+
+
+
+
+
+        
+
+                
+
+            #Flip close conections with a probability of e to an other individual
+            for i in range(self.N):
+                #only flip for the connections that are selected in the initial Network, select only individuals that are not connected in the original setting and that are not the individual itself
+                mask_original = mask_originally_connected[i]
+                
+                #mask the entries for this individuum that are not zero, and can there for be flipped
+                mask_possible = self.Network[i]
+
+                #Get a random selection to decide if a connectio is flipped
+                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(device)
+
+                #Get the connections that are flipped
+                mask = mask_original * mask_possible * mask_random
+
+                #store the old connections
+                old = torch.arange(self.N)[mask.bool()]
+
+                #FLip the selected connection to an individual that is not yet connected
+                #Get the indices of the people that are not yet connected
+                not_connected = torch.arange(self.N)[self.Network[i] == 0.0]
+
+                #Not possible to flip to its self
+                not_connected = not_connected[not_connected != i]
+
+                #select as many of the not connected individuals as there are connections to flip
+                n_reconnect = int(mask.sum().item())
+
+                if n_reconnect != 0:
+                    #select n_reconnect individuals
+                    indices = torch.randperm(len(not_connected))[:n_reconnect]
+                    l = len(indices)
+                    k = i * torch.ones(l,dtype=torch.int64)
+
+                    #set the old entry to zero
+                    self.Network[k,old[:l]] = 0
+                    self.Network[old[:l],k] = 0
+
+                    #set the new connections
+                    self.Network[k,indices] = 1
+                    self.Network[indices,k] = 1
 
         elif version == "V3":
             if N % 2 != 0: raise ValueError("select even populationsize!")
@@ -324,3 +408,39 @@ if __name__ == "__main__":
     plt.legend()
     plt.savefig('plots/sim.jpg')
     plt.close()
+
+    '''
+D = 8
+N = 1000
+M = 20
+import time
+
+ratio = []
+
+#Measure the time
+if True:
+    time_start = time.time()
+
+    for n in range(10,10000,500):
+        print(n)
+        for i in range(M):
+            W_fast = World(N = N,D = D,version="V2_old")
+        time_end = time.time()
+
+        t_old = time_end - time_start
+
+        #print(f"time old version: t = {(time_end -  time_start) / M}")
+
+        time_start = time.time()
+        for i in range(M):
+            W_fast = World(N = N,D = D,version="V2")
+        time_end = time.time()
+
+        t_new = time_end - time_start
+
+        #print(f"time new version: t = {(time_end -  time_start) / M}")
+
+        ratio.append([n,t_new / t_old])
+
+np.savetxt("ratios.txt",ratio)
+'''
