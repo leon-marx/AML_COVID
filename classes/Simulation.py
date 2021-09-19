@@ -23,7 +23,7 @@ class World():
     Note:
         In this implementatio, it is possible, that a person can be infected by multiple persons in a single time step
     '''
-    def __init__(self,N = 50,D = 8,r = 0.2,d = 14,N_init = 5,epsilon = 0.1,version = "V2"):
+    def __init__(self,N = 50,D = 8,r = 0.2,d = 14,N_init = 5,epsilon = 0.1,version = "V2",device="cuda" if torch.cuda.is_available() else "cpu"):
         self.N = N #Size of teh populatio
         self.D = D #Degree, number of contact persons
         self.r = r #Rate of passing th einfection to an susceptible neighbor with in one day
@@ -173,12 +173,12 @@ class World():
 
             #Connect to the D nearest neighbors
             for i in range(1,int(D // 2)+1):
-                self.Network += torch.Tensor(np.eye(N,k=i))
-                self.Network += torch.Tensor(np.eye(N,k=-i))
+                self.Network += torch.Tensor(np.eye(N,k=i)).to(device)
+                self.Network += torch.Tensor(np.eye(N,k=-i)).to(device)
 
             #Handle the case that D is odd
             if D % 2 != 0:
-                self.Network += torch.Tensor(np.eye(N,k=int(D // 2)+1))
+                self.Network += torch.Tensor(np.eye(N,k=int(D // 2)+1)).to(device)
 
             mask_originally_connected = self.Network
 
