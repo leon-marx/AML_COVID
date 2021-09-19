@@ -172,7 +172,7 @@ if __name__ == "__main__":
             pp_grid = {
                 "epsilon": [0.1],
                 "D": list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
-                "r": list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
+                "r": [0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
                 "d": list(np.linspace(5,10,6)), #[5], #list(np.linspace(5,10,6)),
                 "N_init": [5,10,15]
             }
@@ -195,7 +195,7 @@ if __name__ == "__main__":
     pp_grid = {
         "epsilon": [0.1],
         "D": [5,10], #list(np.linspace(5,10,6)),
-        "r": [0.05], #list(np.linspace(0.05,0.2,4)),
+        "r": [0.05], #list(np.linspace(0.01,0.2,)),
         "d": [5], #list(np.linspace(5,10,6)),
         "N_init": [5,10,15]
     }
