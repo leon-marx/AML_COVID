@@ -52,7 +52,7 @@ class GridSearch_PP_finder():
 
         mse = (ts_1 - ts_2)**2
 
-        return np.mean(mse)
+        return torch.mean(mse)
 
     def get_time_series(self,mode,parameters):
         '''
