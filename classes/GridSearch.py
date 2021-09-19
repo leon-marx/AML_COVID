@@ -1,14 +1,10 @@
-from torch._C import device, parse_schema
 from Datahandler import DataHandler
 import matplotlib.pyplot as plt
-import sobol_seq
 import numpy as np
-import GPy
-import scipy
-import optunity
 import itertools
 from operator import itemgetter
 import torch 
+import pandas as pd
 
 class GridSearch_PP_finder():
     def __init__(self, pp_grid, N_pop = 10000,version = "V2",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120):
@@ -142,8 +138,12 @@ class GridSearch_PP_finder():
         country = params_real["file"].split(".")[0]
         plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}")
         plt.legend()
-        plt.savefig(f"./plots/GS_fit_{country}_{params_real['wave']}.jpg")
+        plt.savefig(f"./gridsearch/plots/GS_fit_{country}_{params_real['wave']}.jpg")
         plt.close()
+
+        # save results
+        df_results = pd.DataFrame(results)
+        df_results.to_csv(f"./gridsearch/GS_fit_{country}_{params_real['wave']}.csv")
 
 if __name__ == "__main__": 
 
