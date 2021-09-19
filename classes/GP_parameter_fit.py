@@ -7,7 +7,7 @@ import scipy
 import optunity
 
 class GP_PP_finder():
-    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1]),upper_lims = np.array([0.5,15,0.25,10]),N_pop = 5000,version = "V3",device = "cpu",iterations = 120):
+    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1]),upper_lims = np.array([0.5,15,0.25,10]),N_pop = 10000,version = "V3",device = "cpu",iterations = 120):
         '''
         parameters:
             params_real             Paramters describing the real time series
@@ -15,7 +15,7 @@ class GP_PP_finder():
             lower_lims              Lower limits of the initial pandemic parameters [epsilon,degree,infection_rate,N_init]
             upper_lims              Upper limits of the initial pandemic parameters [epsilon,degree,infection_rate,N_init]
             N_pop                   Number of individuals in the small world model
-            version                 Version of the Small world model                
+            version                 Version of the Small world model                +
             device                  Device
             iterations              Number of iterations to find the optimal pandemic parameters
         '''
