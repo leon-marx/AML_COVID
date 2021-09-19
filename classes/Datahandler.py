@@ -35,7 +35,7 @@ class DataHandler():
             if params["full"] == False:
                 
                 #Load the dictionary containig the information about the linear parts
-                with open("./Countries/wave_regions.json","r") as file:
+                with open("./classes/Countries/wave_regions.json","r") as file:
                     wave_dict = json.load(file)
 
                 if params["wave"] > wave_dict[params["file"].split('.')[0]]["N_waves"]:
@@ -44,11 +44,11 @@ class DataHandler():
                 lower = wave_dict[params["file"].split('.')[0]][f"{params['wave']}"][0]
                 upper = wave_dict[params["file"].split('.')[0]][f"{params['wave']}"][1]
 
-                self.cumulative = np.loadtxt("./Countries/"+params["file"],skiprows=4)[lower:upper]
+                self.cumulative = np.loadtxt("./classes/Countries/"+params["file"],skiprows=4)[lower:upper]
             
             #Use the full time series
             else:
-                self.cumulative = np.loadtxt("./Countries/"+params["file"],skiprows=4)
+                self.cumulative = np.loadtxt("./classes/Countries/"+params["file"],skiprows=4)
 
             #Apply moving average to smoothen the time series
             if params["use_running_average"] == True:
