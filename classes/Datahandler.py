@@ -1,12 +1,15 @@
 from sys import version
 import torch
 import numpy as np
+import pandas as pd
 from torch._C import device
 from Simulation import World
 import matplotlib.pyplot as plt
 from Toydata import create_toydata
 from scipy.optimize import curve_fit
 import json
+import ast
+
 
 class DataHandler():
     def __init__(self,mode,params,device):
@@ -74,7 +77,7 @@ class DataHandler():
             return_plain: return the whole time series, default = False
 
         Returns:
-            batch:              B consecutive sequences of lenght L of the stored time series (default) as tensor of shape [L,B,1]7
+            batch:              B consecutive sequences of length L of the stored time series (default) as tensor of shape [L,B,1]7
                                 self.cumulative in shape [len(self.cumulative)] if return_plain == True, as numpy array
             starting_points:    Starting pints of the slices
         '''
@@ -82,7 +85,7 @@ class DataHandler():
         #return the full time series
         if return_plain: return self.cumulative, None #.numpy(),None
         
-        #Checck if the selected lenght of the slices is valid
+        #Check if the selected length of the slices is valid
         if self.T <= L: raise(ValueError("Selected sequence lenght exceeds lenght of time series"))
 
         #Get the batch
@@ -157,17 +160,18 @@ class Sampler():
         self.version = version
         self.device = device
     
-    def __call__(self,K,L,B):
+    def __call__(self,K,L,B,mode="random"):
         '''
         parameters:
-            K:      Number of Simulations from differnt pandemic parameter combinations
-            L:      Lengh of the slices
+            K:      Number of Simulations from different pandemic parameter combinations
+            L:      Length of the slices
             B:      Number of slices per pandemic parameter combination
+            mode:   if PP combinations are chosen randomly or based on optimization on the real curves ("random", "optimized")
 
         returns:
             batch:                  Tensor of slices, shape of batch: [B*K, L ,1]
-            pandemic_parameters:    Pandmic parameters used to generate the corresponding entry in batch
-            starting_points:        Startingpositions of the differnt sliecs in teh time series
+            pandemic_parameters:    Pandemic parameters used to generate the corresponding entry in batch
+            starting_points:        Startingpositions of the different slices in teh time series
         '''
 
         params_simulation = {}
@@ -175,84 +179,128 @@ class Sampler():
         params_simulation["version"] = self.version
         params_simulation["T"] = self.T
 
-        batch = torch.zeros([B*K,L]).to(self.device)
-        pandemic_parameters = torch.zeros([B*K,5]).to(self.device) #order: (N, D, r, d, epsilon)
-        starting_points = torch.zeros([B*K]).to(self.device)
-
-        for i in range(K):
-            #Sample the Pandemic parameters randomly from a uniform distribution
-            for k in self.lower_lims.keys():
-                if k == "N_init" or k == "D":
-                    params_simulation[k] = int(np.random.uniform(self.lower_lims[k],self.upper_lims[k]))
-                else:
-                    params_simulation[k] = np.random.uniform(self.lower_lims[k],self.upper_lims[k])
-
-            #Get the simulation
-            DH = DataHandler("Simulation",params_simulation,device=self.device)
-
-            #Sample from the Data handler
-            b,sp,PP= DH(B,L) #returns batch with shape [L,B,1]
+        if mode == "random":
             
-            batch[i * B:(i+1) * B] = b.squeeze().T
+            batch = torch.zeros([B*K,L]).to(self.device)
+            pandemic_parameters = torch.zeros([B*K,5]).to(self.device) #order: (N, D, r, d, epsilon)
+            starting_points = torch.zeros([B*K]).to(self.device)
 
-            pandemic_parameters[i * B:(i+1) * B] = torch.tensor([params_simulation["N"], params_simulation["D"],params_simulation["r"],params_simulation["d"],params_simulation["epsilon"]])[None,:]
-            starting_points[i * B : (i+1) * B] = torch.tensor(sp)
-            # print(sp)
+            for i in range(K):
+                #Sample the Pandemic parameters randomly from a uniform distribution
+                for k in self.lower_lims.keys():
+                    if k == "N_init" or k == "D":
+                        params_simulation[k] = int(np.random.uniform(self.lower_lims[k],self.upper_lims[k]))
+                    else:
+                        params_simulation[k] = np.random.uniform(self.lower_lims[k],self.upper_lims[k])
 
-        #Shuffle the batch
-        indices = np.random.permutation(B * K)
+                #Get the simulation
+                DH = DataHandler("Simulation",params_simulation,device=self.device)
 
-        batch = batch[indices].to(self.device)
-        pandemic_parameters = pandemic_parameters[indices].repeat(L, 1, 1).to(self.device)
-        starting_points = starting_points[indices].to(self.device)
+                #Sample from the Data handler
+                b,sp,PP= DH(B,L) #returns batch with shape [L,B,1]
+                
+                batch[i * B:(i+1) * B] = b.squeeze().T
 
-        #reshape the batch 
-        batch = batch.T.view([L,B * K,1]).to(self.device)
+                pandemic_parameters[i * B:(i+1) * B] = torch.tensor([params_simulation["N"], params_simulation["D"],params_simulation["r"],params_simulation["d"],params_simulation["epsilon"]])[None,:]
+                starting_points[i * B : (i+1) * B] = torch.tensor(sp)
+                # print(sp)
 
+            #Shuffle the batch
+            indices = np.random.permutation(B * K)
+
+            batch = batch[indices].to(self.device)
+            pandemic_parameters = pandemic_parameters[indices].repeat(L, 1, 1).to(self.device)
+            starting_points = starting_points[indices].to(self.device)
+
+            #reshape the batch 
+            batch = batch.T.view([L,B * K,1]).to(self.device)
+        
+        elif mode == "optimized":
+
+            #TODO include N (population size) and country 
+
+            #Read optimized pp from file
+            with open("./config.json", "r") as f: 
+                config = json.load(f)
+            df_pp = pd.read_csv(config["path_optimized_pp"])
+            pp = df_pp['0']
+
+            assert K <= len(pp) # number of different pp combinations
+            batch = torch.zeros([B*K,L]).to(self.device)
+            pandemic_parameters = torch.zeros([B*K,5]).to(self.device) #order: (N, D, r, d, epsilon)
+            starting_points = torch.zeros([B*K]).to(self.device)
+
+            #Get the simulation for all combinations
+            i = 0
+            for pp_combination in pp:
+                
+                # Instantiate Data handler 
+                pp_combination = ast.literal_eval(pp_combination)
+                pp_combination["N"] = params_simulation["N"]
+                pp_combination["T"] = params_simulation["T"] 
+                pp_combination["version"] = params_simulation["version"]
+                DH = DataHandler("Simulation", pp_combination, device=self.device)
+
+                #Sample from the Data handler
+                b,sp,PP= DH(B,L) #returns batch with shape [L,B,1]
+                batch[i * B:(i+1) * B] = b.squeeze().T
+                pandemic_parameters[i * B:(i+1) * B] = torch.tensor([pp_combination["N"], pp_combination["D"],pp_combination["r"],pp_combination["d"],pp_combination["epsilon"]])[None,:]
+                starting_points[i * B : (i+1) * B] = torch.tensor(sp)
+                i+=1
+        
         return batch,pandemic_parameters,starting_points
 
 
 
+
+if __name__ == "__main__":
+
 #####################################################################################
-#Example sampler
+#Example Sampler
 #####################################################################################
-"""
-lower_lims = {
-    "D":1,
-    "r":0.0,
-    "d":7,
-    "N_init":0,
-    "epsilon":0.0
-}
 
-upper_lims = {
-    "D":5,
-    "r":0.5,
-    "d":21,
-    "N_init":20,
-    "epsilon":0.5
-}
-L = 10
-K = 3
-B = 3
-T = 50
+    lower_lims = {
+        "D":1,
+        "r":0.0,
+        "d":7,
+        "N_init":0,
+        "epsilon":0.0
+    }
+
+    upper_lims = {
+        "D":5,
+        "r":0.5,
+        "d":21,
+        "N_init":20,
+        "epsilon":0.5
+    }
+
+    N = 1000 
+    L = 20 #10
+    K = 3
+    B = 3
+    T = 50
+
+    #Random Sampler 
+    #S = Sampler(lower_lims,upper_lims,1000,T,"V3","cpu")
+    #batch,pandemic_parameters,starting_points = S(K,L,B)
+    #batch = batch.detach().view(L,K*B).numpy().T
+    #starting_points = starting_points.detach().numpy()
+
+    #Optimized Sampler 
+    S = Sampler(lower_lims=None, upper_lims=None, N=N, T=T, version="V2", device="cpu")
+    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode="optimized")
+
+    #plot the slices
+    x = np.arange(0,L)
+    for i in range(K * B):
+        plt.plot(x + starting_points[i],batch[i],color = "b")
+        plt.xlim([0,T])
+
+    plt.legend()
+    plt.show()
+
 '''
-S = Sampler(lower_lims,upper_lims,1000,T,"V3","cpu")
-
-batch,pandemic_parameters,starting_points = S(K,L,B)
-batch = batch.detach().view(L,K*B).numpy().T
-starting_points = starting_points.detach().numpy()
-
-#plot the slices
-x = np.arange(0,L)
-for i in range(K * B):
-    plt.plot(x + starting_points[i],batch[i],color = "b")
-    plt.xlim([0,T])
-
-plt.legend()
-plt.show()
-'''
-
 #####################################################################################
 #Example
 #####################################################################################
@@ -286,8 +334,6 @@ params_SIR = {
 B = 2
 L = 9 
 
-'''
-
 params_simulation["version"] = "V1"
 DH = DataHandler("Simulation",params_simulation,device = "cpu")
 batch2,starting_points  = DH(B,L,return_plain=True)
@@ -306,6 +352,4 @@ plt.plot(batch2,label = "V3")
 plt.legend()
 plt.show()
 
-
 '''
-"""
