@@ -71,7 +71,7 @@ class Pipeline():
         
         # Plot results 
         plt.figure(figsize=(12, 12))
-        for i in range(test_data.shape[1]):
+        for i in range(min(test_data.shape[1],9)):
             plt.subplot(3, 3, i+1)
             test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-timesteps_to_predict]
             test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-timesteps_to_predict:].to("cpu").view(-1).detach().numpy()
@@ -81,16 +81,16 @@ class Pipeline():
             plt.scatter(np.arange(L-timesteps_to_predict,L), pred, color="C1", label="prediction")
             plt.scatter(np.arange(L-timesteps_to_predict,L), test_slice_y, color="C0", marker="x", label="ground truth")
             plt.legend()
-        plt.savefig('plots/lstm5.jpg')
+        plt.savefig('plots/lstm6.jpg')
 
 if __name__ == '__main__':
 
     # Hyperparameters for simulation 
     N = 1000 
-    K = 10 # how many different simulation samples 
+    K = 50 # how many different simulation samples 
     T = 50
     B = 1 #3 # batch size -> how many sequences should be sampled #TODO Why the same data multiple times?
-    L = 20 #10
+    L = 30 #10
     version="V2"
     device="cuda" if torch.cuda.is_available() else "cpu"
     train_test_split = 0.2
@@ -103,8 +103,8 @@ if __name__ == '__main__':
     dropout = 0.5
     learning_rate = 0.0001
 
-    num_epochs = 10
-    timesteps_to_predict = 2
+    num_epochs = 100
+    timesteps_to_predict = 5
 
     # Start evaluation
     pipeline = Pipeline(N=N, K=K, T=T, B=B, L=L, version=version, train_test_split=train_test_split, timesteps_to_predict=timesteps_to_predict, num_epochs=num_epochs, input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, dropout=dropout, learning_rate=learning_rate, device="cuda" if torch.cuda.is_available() else "cpu")
