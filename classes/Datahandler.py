@@ -80,7 +80,7 @@ class DataHandler():
         '''
 
         #return the full time series
-        if return_plain: return self.cumulative.numpy(),None
+        if return_plain: return self.cumulative, None #.numpy(),None
         
         #Checck if the selected lenght of the slices is valid
         if self.T <= L: raise(ValueError("Selected sequence lenght exceeds lenght of time series"))
