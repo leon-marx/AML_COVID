@@ -232,10 +232,9 @@ class Sampler():
 
             #Get the simulation for all combinations
             i = 0
-            for pp_combination in pp:
-                
+            for i in range(K):
                 # Instantiate Data handler 
-                pp_combination = ast.literal_eval(pp_combination)
+                pp_combination = ast.literal_eval(pp[i]) #cast i string(dict) -> dict
                 pp_combination["N"] = params_simulation["N"]
                 pp_combination["T"] = params_simulation["T"] 
                 pp_combination["version"] = params_simulation["version"]
@@ -294,11 +293,11 @@ if __name__ == "__main__":
     #plot the slices
     x = np.arange(0,L)
     for i in range(K * B):
-        plt.plot(x + starting_points[i],batch[i],color = "b")
+        plt.plot(x + starting_points[i].numpy(),batch[i],color = "b")
         plt.xlim([0,T])
 
     plt.legend()
-    plt.show()
+    plt.savefig("./plots/sampler.png")
 
 '''
 #####################################################################################
