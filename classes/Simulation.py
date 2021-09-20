@@ -5,9 +5,15 @@ from numpy.lib.function_base import select
 import torch
 import time
 
-
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Device used: ",device)
+'''
+######################################################################
+important:
+
+Currently, only version "V2" works correctly!
+'''
+
 
 class World():
     '''
@@ -23,7 +29,7 @@ class World():
     Note:
         In this implementatio, it is possible, that a person can be infected by multiple persons in a single time step
     '''
-    def __init__(self,N = 50,D = 8,r = 0.2,d = 14,N_init = 5,epsilon = 0.1,version = "V2",device="cuda" if torch.cuda.is_available() else "cpu"):
+    def __init__(self,N = 50,D = 8,r = 0.2,d = 14,N_init = 5,epsilon = 0.1,version = "V2",device="cuda" if torch.cuda.is_available() else "cpu",eval = False,file = None):
         self.N = N #Size of teh populatio
         self.D = D #Degree, number of contact persons
         self.r = r #Rate of passing th einfection to an susceptible neighbor with in one day
@@ -71,7 +77,7 @@ class World():
             #Counter how long a person has been infected
             self.duration = torch.zeros(self.N).to(device)
 
-        elif version == "V2_old":
+        elif version == "V2":
             if N % 2 != 0: raise ValueError("select even populationsize!")
             #Fixed average degree
             self.D = D
@@ -95,61 +101,83 @@ class World():
             for i in range(self.N):
                 for j in range(1,int(D // 2)+1):
                     self.Network[i][i-j] = 1
+                    self.Network[i-j][i] = 1 #Symmetry added
 
                 for j in range(1,int(D // 2) + 1):
                     self.Network[i][(i+j) % self.N] = 1
+                    self.Network[(i+j) % self.N][i]= 1 #Symmetry added
 
             #Handle the case that D is odd
             if D % 2 != 0:
                 for i in range(self.N):
                     self.Network[i][(i+int(D // 2) +1 )%self.N] = 1
-            
-            mask_originally_connected = self.Network
+                    self.Network[(i+int(D // 2) +1 )%self.N][i] = 1 #Symmetry added
 
-            #print(self.Network,"\n")
+            mask_originally_connected = self.Network.clone().to(device)
 
+            #Plot nice images for visualization of the init process
+            if eval == True:
+                rows_subplots = 1
+                cols_subplots = 3
+                width = 15
+
+                Network_copy = self.Network.clone()
+
+                plt.figure(figsize = (width * cols_subplots,width))
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="Connect to D nearest neighbors")
 
             #Flip close conections with a probability of e to an other individual
             for i in range(self.N):
                 #only flip for the connections that are selected in the initial Network, select only individuals that are not connected in the original setting and that are not the individual itself
-                mask_original = torch.where(mask_originally_connected[i] != 0,1.0,0.0)
+                mask_original = mask_originally_connected[i]
                 
                 #mask the entries for this individuum that are not zero, and can there for be flipped
-                mask_possible = self.Network[i]
+                mask_possible = self.Network[i].clone().to(device)
 
-                #Get a random selection to decide if a connectio is flipped
+                #Get a random selection to decide if a connection is flipped
                 mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(device)
 
                 #Get the connections that are flipped
                 mask = mask_original * mask_possible * mask_random
 
-                #store the old connections
-                old = torch.arange(self.N)[mask.bool()]
+                #store the old neighbors that are no longer connected after the flipping
+                no_longer_neighbors = torch.arange(self.N)[mask.bool()]
 
                 #FLip the selected connection to an individual that is not yet connected
-                #Get the indices of the people that are not yet connected
-                not_connected = torch.arange(self.N)[self.Network[i] == 0.0]
+                #Get the indices of the people that are not yet connected and which have not been connnected in the initial setting
+                mask_potential_new_neighbors = (self.Network[i] == 0.0) * (mask_originally_connected[i] == 0.0)
+                mask_potential_new_neighbors[i] = False
 
-                #Not possible to flip to its self
-                not_connected = not_connected[not_connected != i]
+                potential_neighbors = torch.arange(self.N)[mask_potential_new_neighbors]
 
                 #select as many of the not connected individuals as there are connections to flip
                 n_reconnect = int(mask.sum().item())
 
-                #select n_reconnect individuals
-                indices = torch.randperm(len(not_connected))[:n_reconnect]
+                #select n_reconnect individuals as new neighbors
+                indices = torch.randperm(len(potential_neighbors))[:n_reconnect]
+                new_neighbors = potential_neighbors[indices]
 
                 #flip the connections
-                for u in range(len(indices)):
+                for u in range(len(no_longer_neighbors)):
                     #set the old entry to zero
-                    self.Network[i][old[u]] = 0
-                    self.Network[old[u]][i] = 0
+                    self.Network[i][no_longer_neighbors[u]] = 0
+                    self.Network[no_longer_neighbors[u]][i] = 0
 
                     #Set the new connection
-                    self.Network[i][indices[u]] = 1
-                    self.Network[indices[u]][i] = 1
+                    self.Network[i][new_neighbors[u]] = 1
+                    self.Network[new_neighbors[u]][i] = 1
+
+            #Plot nice images for visualization of the init process
+            if eval == True:
+                #Mark the connections that are flipped
+                self.plotter(matrix=Network_copy,marker = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=2,title="select connetions that are flipped")
+                
+                #PLot the flipped connections
+                self.plotter(matrix=self.Network,marker = Network_copy,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=3,title="Flipp the selected connections")
+                
+                if eval == True and file is not None: plt.savefig(file)
         
-        elif version == "V2":
+        elif version == "V2_new":
             if N % 2 != 0: raise ValueError("select even populationsize!")
             #Fixed average degree
             self.D = D
@@ -182,13 +210,16 @@ class World():
 
             mask_originally_connected = self.Network
 
+            #Plot nice images for visualization of the init process
+            if eval == True:
+                rows_subplots = 1
+                cols_subplots = 3
+                width = 15
 
+                plt.figure(figsize = (width * cols_subplots,width))
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="Connect to D nearest neighbors")
 
-
-
-        
-
-                
+                Network_copy = self.Network.clone()
 
             #Flip close conections with a probability of e to an other individual
             for i in range(self.N):
@@ -231,6 +262,17 @@ class World():
                     self.Network[k,indices] = 1
                     self.Network[indices,k] = 1
 
+            
+            #Plot nice images for visualization of the init process
+            if eval == True:
+                #Mark the connections that are flipped
+                self.plotter(matrix=Network_copy,marker = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=2,title="select connetions that are flipped")
+                
+                #PLot the flipped connections
+                self.plotter(matrix=self.Network,marker = Network_copy,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=3,title="Flipp the selected connections")
+                
+                if eval == True and file is not None: plt.savefig(file)
+
         elif version == "V3":
             if N % 2 != 0: raise ValueError("select even populationsize!")
 
@@ -263,6 +305,17 @@ class World():
                     self.Network[i][(i+j) % self.N] = 1
 
             mask_originally_connected = self.Network
+
+            #Plot nice images for visualization of the init process
+            if eval == True:
+                rows_subplots = 1
+                cols_subplots = 3
+                width = 15
+
+                plt.figure(figsize = (width * cols_subplots,width))
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="connect to D nearest neighbors")
+
+                Network_copy = self.Network.clone()
 
             #Flip close conections with a probability of e to an other individual
             for i in range(self.N):
@@ -303,6 +356,16 @@ class World():
                     #Set the new connection
                     self.Network[i][indices[u]] = 1
                     self.Network[indices[u]][i] = 1
+
+            #Plot nice images for visualization of the init process
+            if eval == True:
+                #Mark the connections that are flipped
+                self.plotter(matrix=Network_copy,marker = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=2,title="select connetions that are flipped")
+                
+                #PLot the flipped connections
+                self.plotter(matrix=self.Network,marker = Network_copy,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=3,title="Flipp the selected connections")
+                
+                if eval == True and file is not None: plt.savefig(file)
 
         #Counter how long a person has been infected
         self.duration = torch.zeros(self.N).to(device)
@@ -351,7 +414,7 @@ class World():
 
         return ill_recoverd / self.N
 
-    def plotter(self,name):
+    def plotter(self,matrix,marker = None,name = None,cols_subplots = None,rows_subplots = None,subplot_index = None,title = None,fs = 25):
         tic = time.perf_counter()
 
         r_x = 11
@@ -361,25 +424,42 @@ class World():
         x_individuals = r_x + torch.sin(phis[:-1]) * 10
         y_individuals = r_y + torch.cos(phis[:-1]) * 10
 
-        plt.figure(figsize = (15,15))
+        if cols_subplots is None:
+            plt.figure(figsize = (15,15))
+        else:
+            plt.subplot(rows_subplots,cols_subplots,subplot_index)
+            plt.title(title,fontsize = fs)
+
         plt.axis("off")
 
         #draw the connections
         for i in range(self.N):
             for j in range(self.N):
-                if self.Network[i][j] == 1:
+                #Connection
+                if matrix[i][j] == 1: 
                     plt.plot([x_individuals[i],x_individuals[j]],[y_individuals[i],y_individuals[j]],color = "gray")
 
-        #plot individuals
-        plt.plot(x_individuals[(self.P == 1)],y_individuals[(self.P == 1)],ls = "",marker = ".",ms = 50,color = "y",label  = "susceptible")
-        plt.plot(x_individuals[(self.P == 2)],y_individuals[(self.P == 2)],ls = "",marker = ".",ms = 50,color = "r",label  = "infected")
-        plt.plot(x_individuals[(self.P == 3)],y_individuals[(self.P == 3)],ls = "",marker = ".",ms = 50,color = "g",label  = "recoverd")
+                #Connection that is selected to flipp
+                if marker is not None and matrix[i][j] == 1 and marker[i][j] == 0:
+                    plt.plot([x_individuals[i],x_individuals[j]],[y_individuals[i],y_individuals[j]],color = "blue", linewidth=6)
 
-        plt.savefig(name)
-        plt.close()
+                
+
+        #plot individuals
+        plt.plot(x_individuals[(self.P == 1)],y_individuals[(self.P == 1)],ls = "",marker = ".",ms = 100,color = "y",label  = "susceptible")
+        plt.plot(x_individuals[(self.P == 2)],y_individuals[(self.P == 2)],ls = "",marker = ".",ms = 100,color = "r",label  = "infected")
+        plt.plot(x_individuals[(self.P == 3)],y_individuals[(self.P == 3)],ls = "",marker = ".",ms = 100,color = "g",label  = "recoverd")
+
+        if cols_subplots is None:
+            plt.savefig(name)
+            plt.close()
 
         toc = time.perf_counter()
         # print(f"Plotter: {toc - tic:0.4f} seconds")
+
+#Get plots illustrating the initialization of the small wordl model, currently only availlable for V2
+def visualize_init():
+    W = World(N = 14,D = 4,r = 0.1,epsilon=0.1,version = "V2",eval=True,file=f"./evaluation_report/init_steps_V2_old.jpg")
 
 if __name__ == "__main__":
 
@@ -408,39 +488,3 @@ if __name__ == "__main__":
     plt.legend()
     plt.savefig('plots/sim.jpg')
     plt.close()
-
-    '''
-D = 8
-N = 1000
-M = 20
-import time
-
-ratio = []
-
-#Measure the time
-if True:
-    time_start = time.time()
-
-    for n in range(10,10000,500):
-        print(n)
-        for i in range(M):
-            W_fast = World(N = N,D = D,version="V2_old")
-        time_end = time.time()
-
-        t_old = time_end - time_start
-
-        #print(f"time old version: t = {(time_end -  time_start) / M}")
-
-        time_start = time.time()
-        for i in range(M):
-            W_fast = World(N = N,D = D,version="V2")
-        time_end = time.time()
-
-        t_new = time_end - time_start
-
-        #print(f"time new version: t = {(time_end -  time_start) / M}")
-
-        ratio.append([n,t_new / t_old])
-
-np.savetxt("ratios.txt",ratio)
-'''
