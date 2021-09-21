@@ -5,6 +5,7 @@ from matplotlib import pyplot as plt
 import numpy as np
 from torch import nn
 import torch
+import os
 
 # Own Imports
 from LSTM_Model import LSTM
@@ -14,9 +15,11 @@ from Datahandler import Sampler
 
 class Pipeline():
     
-    def __init__(self, N, K, T, B, L, version, train_test_split, timesteps_to_predict, num_epochs, input_size, hidden_size, output_size, num_layers, learning_rate, dropout=0.5, nonlinearity="relu", network="lstm", device="cuda" if torch.cuda.is_available() else "cpu") -> None:
+    def __init__(self, config_id, N, K, T, B, L, version, train_test_split, timesteps_to_predict, num_epochs, input_size, hidden_size, output_size, num_layers, learning_rate, dropout=0.5, nonlinearity="relu", network="lstm", device="cuda" if torch.cuda.is_available() else "cpu") -> None:
         
-        # Define device 
+        # Define config_id & device 
+        self.config_id = config_id
+        os.mkdir(f'results/{config_id}')
         self.device = device 
 
         # Hyperparameters for simulation 
@@ -40,11 +43,14 @@ class Pipeline():
         self.dropout = dropout
         self.nonlinearity = nonlinearity
         self.learning_rate = learning_rate
+
     
     def __getdata__(self):
 
+        # Create samples from Simulation and store a subset for control
         S = Sampler(lower_lims=None, upper_lims=None, N=self.N, T=self.T, version=self.version, device=self.device)
         data,PP_data,starting_points = S(K=K,L=L,B=B,mode="optimized")
+        S.__plotsubset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=data, path=f"./results/{self.config_id}/samplertest.png")
 
         # Split training and test data 
         training_data = data[:int(np.floor(B*K*(1-train_test_split))),...].transpose(0,1).unsqueeze(dim=2) #TODO typically batch-size at index 0?
@@ -65,8 +71,15 @@ class Pipeline():
         loss_fn = nn.MSELoss()
         optimizer = torch.optim.Adam(params=network.parameters(), lr=self.learning_rate)
         return network, loss_fn, optimizer
+    
+    def __savenetwork__(self, epoch, network, optimizer, path):
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': network.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict()
+            }, path)
 
-    def execute(self, config_id):
+    def execute(self):
 
         print('-' * 40)
         print(f"Started Pipeline | Running on: {self.device}")
@@ -81,6 +94,8 @@ class Pipeline():
             network.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer, verbose=True, epoch=epoch)
             if epoch % 20 == 0:
                 network.test_model(test_data=test_data, test_PP=PP_test_data, loss_fn=loss_fn)
+            if epoch % 100 == 0:
+                self.__savenetwork__(epoch=epoch, network=network, optimizer=optimizer, path=f"./results/{self.config_id}/model_{epoch}.ckp")
         
         # Plot results 
         plt.figure(figsize=(12, 12))
@@ -94,15 +109,15 @@ class Pipeline():
             plt.scatter(np.arange(L-timesteps_to_predict,L), pred, color="C1", label="prediction")
             plt.scatter(np.arange(L-timesteps_to_predict,L), test_slice_y, color="C0", marker="x", label="ground truth")
             plt.legend()
-        plt.savefig(f'plots/{config_id}.jpg')
+        plt.savefig(f'results/{self.config_id}/fitted_curve.jpg')
 
 if __name__ == '__main__':
 
     # Hyperparameters for simulation 
-    N = 1000 
-    K = 500 # how many different simulation samples 
+    N = 10000 
+    K = 1000 # how many different simulation samples 
     T = 50
-    B = 3 #3 # batch size -> how many sequences should be sampled #TODO Why the same data multiple times?
+    B = 20 #3 # batch size -> how many sequences should be sampled #TODO Why the same data multiple times?
     L = 30 #10
     version="V2"
     device="cuda" if torch.cuda.is_available() else "cpu"
@@ -122,7 +137,7 @@ if __name__ == '__main__':
     config_id = '09-21_v2_lstm'
 
     # Start evaluation
-    pipeline = Pipeline(N=N, K=K, T=T, B=B, L=L, version=version, train_test_split=train_test_split, timesteps_to_predict=timesteps_to_predict, num_epochs=num_epochs, input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, dropout=dropout, learning_rate=learning_rate, device="cuda" if torch.cuda.is_available() else "cpu")
-    pipeline.execute(config_id)
+    pipeline = Pipeline(config_id=config_id, N=N, K=K, T=T, B=B, L=L, version=version, train_test_split=train_test_split, timesteps_to_predict=timesteps_to_predict, num_epochs=num_epochs, input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, dropout=dropout, learning_rate=learning_rate, device="cuda" if torch.cuda.is_available() else "cpu")
+    pipeline.execute()
 
     

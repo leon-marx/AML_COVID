@@ -252,15 +252,15 @@ class Sampler():
         
         return batch,pandemic_parameters,starting_points
 
-    def __plotsubset____(self, L, K, B, T, starting_points, batch, max_num_plots=9, path="./plots/sampler.png"):
+    def __plotsubset____(self, L, K, B, T, starting_points, batch, max_num_plots=25, path="./plots/sampler.png"):
 
         #plot the slices
         x = np.arange(0,L)
-        num = min(K*B,max_num_plots,9)
+        num = min(K*B,max_num_plots,25)
         plt.figure(figsize=(12, 12))
         plt.suptitle('Samples from simulation')
         for i in range(num):
-            plt.subplot(3, 3, i+1)
+            plt.subplot(5, 5, i+1)
             plt.plot(x, batch[i].cpu().numpy(), color = "b")
             plt.xlim([0,T])
             plt.legend()
@@ -293,8 +293,8 @@ if __name__ == "__main__":
 
     N = 10000 
     L = 20 #10
-    K = 3
-    B = 3
+    K = 5
+    B = 5
     T = 50
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
