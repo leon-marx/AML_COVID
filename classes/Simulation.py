@@ -539,7 +539,58 @@ def visualization_pandemic_dynamics(version = "V2"):
 
     plt.savefig(f"./evaluation_report/pandemic_dynamics_{version}.jpg")
 
+def compare_V2_V3(reps,sets):
+    
 
+    plt.figure(figsize = (45,45))
+    n = 1
+    fs = 45
+
+    for i in range(sets):
+        #Sample Hyperparameter sets
+        D = int(np.random.uniform(1,20))
+        T = 45
+        r = np.random.uniform(1e-3,0.25)
+        e = np.random.uniform(1e-3,0.5)
+        N_init = int(np.random.uniform(1,20))
+        N_pop = 1000
+
+        sum_V2 = np.zeros(T)
+        sum_V3 = np.zeros(T)
+
+        for j in range(reps):
+            #Get the worlds
+            W_V2 = World(N = N_pop,D = D,r = r,N_init = N_init, epsilon=e,version = "V2")
+            W_V3 = World(N = N_pop,D = D,r = r,N_init = N_init, epsilon=e,version = "V3")
+
+            for t in range(T):
+                sum_V2[t] += W_V2()
+                sum_V3[t] += W_V3()
+
+        sum_V2 /= reps
+        sum_V3 /= reps
+
+        plt.subplot(3,3,n)
+        plt.title(f"D = {D}, r = {round(r,3)}, e = {round(e,3)},\nN_init = {int(N_init)}, N = {N_pop}",fontsize = fs)
+        plt.plot(sum_V2,label = "fixed degree D",linewidth=6)
+        plt.plot(sum_V3,label = "poisson distributed degreeD",linewidth=6)
+
+        plt.xlabel("time [days]",fontsize = fs)
+        plt.ylabel("cumulative cases []",fontsize = fs)
+        plt.legend(fontsize = fs)
+
+        plt.xticks(fontsize = fs)
+        plt.yticks(fontsize = fs)
+
+        plt.tight_layout()
+
+        n += 1
+
+    plt.savefig("compare_V2_V3_empirically.jpg")
+
+compare_V2_V3(reps = 25,sets = 9)
+
+        
 if __name__ == "__main__":
 
     # Parameters for the simulation 
