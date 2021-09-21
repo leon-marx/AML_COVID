@@ -452,7 +452,7 @@ class World():
 
         return ill_recoverd / self.N
 
-    def plotter(self,matrix,marker = None,name = None,cols_subplots = None,rows_subplots = None,subplot_index = None,title = None,fs = 35):
+    def plotter(self,matrix,marker = None,name = None,cols_subplots = None,rows_subplots = None,subplot_index = None,title = None,fs = 35,ms = 100):
         tic = time.perf_counter()
 
         r_x = 11
@@ -487,9 +487,9 @@ class World():
                 
 
         #plot individuals
-        plt.plot(x_individuals[(self.P == 1)],y_individuals[(self.P == 1)],ls = "",marker = ".",ms = 100,color = color,label  = "susceptible")
-        plt.plot(x_individuals[(self.P == 2)],y_individuals[(self.P == 2)],ls = "",marker = ".",ms = 100,color = "r",label  = "infected")
-        plt.plot(x_individuals[(self.P == 3)],y_individuals[(self.P == 3)],ls = "",marker = ".",ms = 100,color = "g",label  = "recoverd")
+        plt.plot(x_individuals[(self.P == 1)],y_individuals[(self.P == 1)],ls = "",marker = ".",ms = ms,color = color,label  = "susceptible")
+        plt.plot(x_individuals[(self.P == 2)],y_individuals[(self.P == 2)],ls = "",marker = ".",ms = ms,color = "r",label  = "infected")
+        plt.plot(x_individuals[(self.P == 3)],y_individuals[(self.P == 3)],ls = "",marker = ".",ms = ms,color = "g",label  = "recoverd")
 
         if cols_subplots is None:
             plt.savefig(name)
@@ -502,10 +502,44 @@ class World():
 def visualize_init(version):
     W = World(N = 14,D = 4,r = 0.1,epsilon=0.1,version = version,eval=True,file=f"./evaluation_report/init_steps_{version}.jpg")
 
-visualize_init("V2")
-visualize_init("V3")
+def visualization_pandemic_dynamics(version = "V2"):
+    #initialize the world
+    W = World(N = 60,D=4,r = 0.1,N_init=2,version=version)
 
-'''
+    width = 15
+    interval = 15
+    n_cols = 4
+    n_rows = 2
+
+    fs = 30
+
+    plt.figure(figsize = (n_cols * width, n_rows * width))
+    W.plotter(matrix=W.Network,cols_subplots=n_cols,rows_subplots=n_rows,subplot_index=1,title="T = 0",ms = 55)
+    n = 2
+
+    cases = []
+    
+    for i in range(1,46):
+        c = W().item()
+        cases.append(c)
+
+        if i % interval == 0: 
+            W.plotter(matrix=W.Network,cols_subplots=n_cols,rows_subplots=n_rows,subplot_index=n,title=f"T = {i}",ms = 45)
+
+            plt.subplot(n_rows,n_cols,n+n_cols)
+            plt.plot(cases, linewidth=6)
+            plt.xlabel("time [days]",fontsize = fs)
+            plt.ylabel("relative count of infected individuals since t = 0 []",fontsize = fs)
+            plt.xticks(fontsize = fs)
+            plt.yticks(fontsize = fs)
+            plt.xlim([0,46])
+            plt.ylim([0,1.2])
+
+            n += 1
+
+    plt.savefig(f"./evaluation_report/pandemic_dynamics_{version}.jpg")
+
+
 if __name__ == "__main__":
 
     # Parameters for the simulation 
@@ -533,4 +567,3 @@ if __name__ == "__main__":
     plt.legend()
     plt.savefig('plots/sim.jpg')
     plt.close()
-'''
