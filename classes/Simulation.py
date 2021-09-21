@@ -87,15 +87,30 @@ class World():
             self.N_init = N_init
             self.N = N
 
+
+
             #initialize the population. This array cintains the infection state of each individual
             self.P = torch.ones(self.N).to(device)
+
+            #initialize the social network
+            self.Network = torch.zeros((self.N,self.N)).to(device)
+
+            if eval == True:
+                rows_subplots = 2
+                cols_subplots = 3
+                width = 15
+
+                plt.figure(figsize = (width * cols_subplots,width * rows_subplots))
+                #Locate dots on a circle
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="A")
 
             #Get the initail infected persons randomly
             indices = torch.randperm(self.N)[:self.N_init].to(device)
             self.P[indices] = torch.ones(self.N_init).to(device) * 2
 
-            #initialize the social network
-            self.Network = torch.zeros((self.N,self.N)).to(device)
+            if eval == True:
+                #randomly select infected individuals
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=2,title="B")
 
             #Connect to the D nearest neighbors
             for i in range(self.N):
@@ -117,14 +132,10 @@ class World():
 
             #Plot nice images for visualization of the init process
             if eval == True:
-                rows_subplots = 1
-                cols_subplots = 3
-                width = 15
-
                 Network_copy = self.Network.clone()
-
-                plt.figure(figsize = (width * cols_subplots,width))
-                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="Connect to D nearest neighbors")
+                
+                #Connect to the D nearest neighbors
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=3,title="C")
 
             #Flip close conections with a probability of e to an other individual
             for i in range(self.N):
@@ -170,10 +181,13 @@ class World():
             #Plot nice images for visualization of the init process
             if eval == True:
                 #Mark the connections that are flipped
-                self.plotter(matrix=Network_copy,marker = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=2,title="select connetions that are flipped")
+                self.plotter(matrix=Network_copy,marker = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=4,title="D")
                 
                 #PLot the flipped connections
-                self.plotter(matrix=self.Network,marker = Network_copy,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=3,title="Flipp the selected connections")
+                self.plotter(matrix=self.Network,marker = Network_copy,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=5,title="E")
+
+                #Final network
+                self.plotter(matrix=self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=6,title="F")
                 
                 if eval == True and file is not None: plt.savefig(file)
         
@@ -279,6 +293,7 @@ class World():
             #sample the degrees from a poisson distribution with mean and variance D
             D = np.random.poisson(lam = self.D, size=self.N)
 
+            #Fixed average degree
             self.D = D
             self.r = r
             self.e = epsilon
@@ -286,84 +301,107 @@ class World():
             self.N_init = N_init
             self.N = N
 
+
+
             #initialize the population. This array cintains the infection state of each individual
             self.P = torch.ones(self.N).to(device)
 
-            #Get the initial infected persons randomly
+            #initialize the social network
+            self.Network = torch.zeros((self.N,self.N)).to(device)
+
+            if eval == True:
+                rows_subplots = 2
+                cols_subplots = 3
+                width = 15
+
+                plt.figure(figsize = (width * cols_subplots,width * rows_subplots))
+                #Locate dots on a circle
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="A")
+
+            #Get the initail infected persons randomly
             indices = torch.randperm(self.N)[:self.N_init].to(device)
             self.P[indices] = torch.ones(self.N_init).to(device) * 2
 
-            #initialize the social network
-            self.Network = torch.zeros((self.N,self.N)).to(device)
+            if eval == True:
+                #randomly select infected individuals
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=2,title="B")
 
             #Connect to the D nearest neighbors
             for i in range(self.N):
                 for j in range(1,int(D[i] // 2)+1):
                     self.Network[i][i-j] = 1
+                    self.Network[i-j][i] = 1 #Symmetry added
 
                 for j in range(1,int(D[i] // 2) + 1):
                     self.Network[i][(i+j) % self.N] = 1
+                    self.Network[(i+j) % self.N][i]= 1 #Symmetry added
 
-            mask_originally_connected = self.Network
+            #Handle the case that D is odd
+            if D[i] % 2 != 0:
+                for i in range(self.N):
+                    self.Network[i][(i+int(D[i] // 2) +1 )%self.N] = 1
+                    self.Network[(i+int(D[i] // 2) +1 )%self.N][i] = 1 #Symmetry added
+
+            mask_originally_connected = self.Network.clone().to(device)
 
             #Plot nice images for visualization of the init process
             if eval == True:
-                rows_subplots = 1
-                cols_subplots = 3
-                width = 15
-
-                plt.figure(figsize = (width * cols_subplots,width))
-                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="connect to D nearest neighbors")
-
                 Network_copy = self.Network.clone()
+                
+                #Connect to the D nearest neighbors
+                self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=3,title="C")
 
             #Flip close conections with a probability of e to an other individual
             for i in range(self.N):
                 #only flip for the connections that are selected in the initial Network, select only individuals that are not connected in the original setting and that are not the individual itself
-                mask_original = torch.where(mask_originally_connected[i] != 0,1.0,0.0)
+                mask_original = mask_originally_connected[i]
                 
                 #mask the entries for this individuum that are not zero, and can there for be flipped
-                mask_possible = self.Network[i]
+                mask_possible = self.Network[i].clone().to(device)
 
-                #Get a random selection to decide if a connectio is flipped
+                #Get a random selection to decide if a connection is flipped
                 mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(device)
 
                 #Get the connections that are flipped
                 mask = mask_original * mask_possible * mask_random
 
-                #store the old connections
-                old = torch.arange(self.N)[mask.bool()]
+                #store the old neighbors that are no longer connected after the flipping
+                no_longer_neighbors = torch.arange(self.N)[mask.bool()]
 
                 #FLip the selected connection to an individual that is not yet connected
-                #Get the indices of the people that are not yet connected
-                not_connected = torch.arange(self.N)[self.Network[i] == 0.0]
+                #Get the indices of the people that are not yet connected and which have not been connnected in the initial setting
+                mask_potential_new_neighbors = (self.Network[i] == 0.0) * (mask_originally_connected[i] == 0.0)
+                mask_potential_new_neighbors[i] = False
 
-                #Not possible to flip to its self
-                not_connected = not_connected[not_connected != i]
+                potential_neighbors = torch.arange(self.N)[mask_potential_new_neighbors]
 
                 #select as many of the not connected individuals as there are connections to flip
                 n_reconnect = int(mask.sum().item())
 
-                #select n_reconnect individuals
-                indices = torch.randperm(len(not_connected))[:n_reconnect]
+                #select n_reconnect individuals as new neighbors
+                indices = torch.randperm(len(potential_neighbors))[:n_reconnect]
+                new_neighbors = potential_neighbors[indices]
 
                 #flip the connections
-                for u in range(len(indices)):
+                for u in range(len(no_longer_neighbors)):
                     #set the old entry to zero
-                    self.Network[i][old[u]] = 0
-                    self.Network[old[u]][i] = 0
+                    self.Network[i][no_longer_neighbors[u]] = 0
+                    self.Network[no_longer_neighbors[u]][i] = 0
 
                     #Set the new connection
-                    self.Network[i][indices[u]] = 1
-                    self.Network[indices[u]][i] = 1
+                    self.Network[i][new_neighbors[u]] = 1
+                    self.Network[new_neighbors[u]][i] = 1
 
             #Plot nice images for visualization of the init process
             if eval == True:
                 #Mark the connections that are flipped
-                self.plotter(matrix=Network_copy,marker = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=2,title="select connetions that are flipped")
+                self.plotter(matrix=Network_copy,marker = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=4,title="D")
                 
                 #PLot the flipped connections
-                self.plotter(matrix=self.Network,marker = Network_copy,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=3,title="Flipp the selected connections")
+                self.plotter(matrix=self.Network,marker = Network_copy,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=5,title="E")
+
+                #Final network
+                self.plotter(matrix=self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=6,title="F")
                 
                 if eval == True and file is not None: plt.savefig(file)
 
@@ -414,7 +452,7 @@ class World():
 
         return ill_recoverd / self.N
 
-    def plotter(self,matrix,marker = None,name = None,cols_subplots = None,rows_subplots = None,subplot_index = None,title = None,fs = 25):
+    def plotter(self,matrix,marker = None,name = None,cols_subplots = None,rows_subplots = None,subplot_index = None,title = None,fs = 35):
         tic = time.perf_counter()
 
         r_x = 11
@@ -432,6 +470,9 @@ class World():
 
         plt.axis("off")
 
+        if self.Network.sum() == 0 and self.P.mean() == 1: color = "gray"
+        else: color = "y"
+
         #draw the connections
         for i in range(self.N):
             for j in range(self.N):
@@ -446,7 +487,7 @@ class World():
                 
 
         #plot individuals
-        plt.plot(x_individuals[(self.P == 1)],y_individuals[(self.P == 1)],ls = "",marker = ".",ms = 100,color = "y",label  = "susceptible")
+        plt.plot(x_individuals[(self.P == 1)],y_individuals[(self.P == 1)],ls = "",marker = ".",ms = 100,color = color,label  = "susceptible")
         plt.plot(x_individuals[(self.P == 2)],y_individuals[(self.P == 2)],ls = "",marker = ".",ms = 100,color = "r",label  = "infected")
         plt.plot(x_individuals[(self.P == 3)],y_individuals[(self.P == 3)],ls = "",marker = ".",ms = 100,color = "g",label  = "recoverd")
 
@@ -458,9 +499,13 @@ class World():
         # print(f"Plotter: {toc - tic:0.4f} seconds")
 
 #Get plots illustrating the initialization of the small wordl model, currently only availlable for V2
-def visualize_init():
-    W = World(N = 14,D = 4,r = 0.1,epsilon=0.1,version = "V2",eval=True,file=f"./evaluation_report/init_steps_V2_old.jpg")
+def visualize_init(version):
+    W = World(N = 14,D = 4,r = 0.1,epsilon=0.1,version = version,eval=True,file=f"./evaluation_report/init_steps_{version}.jpg")
 
+visualize_init("V2")
+visualize_init("V3")
+
+'''
 if __name__ == "__main__":
 
     # Parameters for the simulation 
@@ -488,3 +533,4 @@ if __name__ == "__main__":
     plt.legend()
     plt.savefig('plots/sim.jpg')
     plt.close()
+'''
