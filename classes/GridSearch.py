@@ -109,7 +109,7 @@ class GridSearch_PP_finder():
             print(f"PP: {pp} | MSE = {mse}")
 
             #Append 
-            results.append([pp,mse])
+            results.append([pp,mse.cpu()])
 
             # Break if max_eval
             if i > max_evals:
@@ -129,12 +129,12 @@ class GridSearch_PP_finder():
         self.simulation_parameters["r"] = optimal_pp['r']
         self.simulation_parameters["N_init"] = int(optimal_pp['N_init'])
         self.simulation_parameters["epsilon"] = optimal_pp['epsilon']
-        ts_optimal = self.get_time_series("Simulation",self.simulation_parameters,device = self.device)
+        ts_optimal = self.get_time_series("Simulation",self.simulation_parameters)
         
         #plot the best fitting simulation with observed data 
         plt.figure(figsize=(20,10))
-        plt.plot(ts_optimal,label = "simulation")
-        plt.plot(ts_real,label = "observation")
+        plt.plot(ts_optimal.cpu(),label = "simulation")
+        plt.plot(ts_real.cpu(),label = "observation")
         country = params_real["file"].split(".")[0]
         plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}")
         plt.legend()
@@ -171,10 +171,10 @@ if __name__ == "__main__":
 
             pp_grid = {
                 "epsilon": [0.1],
-                "D": list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
-                "r": [0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
-                "d": list(np.linspace(5,10,6)), #[5], #list(np.linspace(5,10,6)),
-                "N_init": [5,10,15]
+                "D": [5], #[5,6,7,8,9,10,15,20], #list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
+                "r": [0.02], #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
+                "d": [14], #[5], #list(np.linspace(5,10,6)),
+                "N_init": [5]# [5,10,15,20,30,40,50,60,70,80,90,100]
             }
 
             gs = GridSearch_PP_finder(pp_grid=pp_grid, iterations = 60)
