@@ -100,9 +100,9 @@ if __name__ == '__main__':
 
     # Hyperparameters for simulation 
     N = 1000 
-    K = 50 # how many different simulation samples 
+    K = 500 # how many different simulation samples 
     T = 50
-    B = 1 #3 # batch size -> how many sequences should be sampled #TODO Why the same data multiple times?
+    B = 3 #3 # batch size -> how many sequences should be sampled #TODO Why the same data multiple times?
     L = 30 #10
     version="V2"
     device="cuda" if torch.cuda.is_available() else "cpu"
