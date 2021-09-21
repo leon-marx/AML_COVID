@@ -1,7 +1,7 @@
 from GP_parameter_fit import GP_PP_finder
 import json
 
-with open("./classes/Countries/wave_regions.json","r") as file:
+with open("./Countries/wave_regions.json","r") as file:
     waves = json.load(file)
 
 for country in waves.keys():
@@ -20,5 +20,5 @@ for country in waves.keys():
             "dt_running_average":14
         }
 
-        gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)
+        gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 240)
         gp(params_real)
