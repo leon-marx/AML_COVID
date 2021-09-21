@@ -5,9 +5,10 @@ import numpy as np
 import GPy
 import scipy
 import optunity
+import torch 
 
 class GP_PP_finder():
-    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1]),upper_lims = np.array([0.5,15,0.25,10]),N_pop = 2500,version = "V3",device = "cpu",iterations = 120):
+    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1]),upper_lims = np.array([0.5,15,0.25,10]),N_pop = 2500,version = "V3",device = "cuda" if torch.cuda.is_available() else "cpu",iterations = 120):
         '''
         parameters:
             params_real             Paramters describing the real time series
@@ -213,15 +214,22 @@ class GP_PP_finder():
         plt.savefig(f"./Images_GP_fit/{country}_{params_real['wave']}.jpg")
         plt.close()
 
-'''
-params_real = {
-    "file":"Israel.txt",
-    "wave":3,
-    "full":False,
-    "use_running_average":True,
-    "dt_running_average":14
-}
+        return self.simulation_parameters
 
-gp = GP_PP_finder(N_initial_PP_samples = 50,iterations = 100)
-gp(params_real)
-'''
+
+# Example usage 
+if __name__ == "__main__":
+
+    params_real = {
+        "file":"Israel.txt",
+        "wave":3,
+        "full":False,
+        "use_running_average":True,
+        "dt_running_average":14
+    }
+
+    gp = GP_PP_finder(N_initial_PP_samples = 50,iterations = 100)
+    
+    optimal_simulation_parameters = gp(params_real)
+
+    print(optimal_simulation_parameters)
