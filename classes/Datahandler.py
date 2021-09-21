@@ -174,6 +174,9 @@ class Sampler():
             starting_points:        Startingpositions of the different slices in teh time series
         '''
 
+        print('-'*40)
+        print('Started sampling')
+
         params_simulation = {}
         params_simulation["N"] = self.N
         params_simulation["version"] = self.version

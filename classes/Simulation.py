@@ -588,7 +588,7 @@ def compare_V2_V3(reps,sets):
 
     plt.savefig("compare_V2_V3_empirically.jpg")
 
-compare_V2_V3(reps = 25,sets = 9)
+
 
         
 if __name__ == "__main__":
@@ -618,3 +618,5 @@ if __name__ == "__main__":
     plt.legend()
     plt.savefig('plots/sim.jpg')
     plt.close()
+
+    # compare_V2_V3(reps = 25,sets = 9)  

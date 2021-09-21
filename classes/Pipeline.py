@@ -41,9 +41,9 @@ class Pipeline():
         self.nonlinearity = nonlinearity
         self.learning_rate = learning_rate
     
-    def __getdata__(self, lower_lims=None, upper_lims=None, N=self.N, T=self.T, version="V2", device="cpu"):
+    def __getdata__(self):
 
-        S = Sampler(lower_lims=None, upper_lims=None, N=self.N, T=self.T, version="V2", device="cpu")
+        S = Sampler(lower_lims=None, upper_lims=None, N=self.N, T=self.T, version=self.version, device=self.device)
         data,PP_data,starting_points = S(K=K,L=L,B=B,mode="optimized")
 
         # Split training and test data 
@@ -66,8 +66,9 @@ class Pipeline():
         optimizer = torch.optim.Adam(params=network.parameters(), lr=self.learning_rate)
         return network, loss_fn, optimizer
 
-    def execute(self):
+    def execute(self, config_id):
 
+        print('-' * 40)
         print(f"Started Pipeline | Running on: {self.device}")
 
         # Get sampled time-series from Simulation based on optimized PP's
@@ -85,7 +86,7 @@ class Pipeline():
         plt.figure(figsize=(12, 12))
         for i in range(min(test_data.shape[1],9)):
             plt.subplot(3, 3, i+1)
-            test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-timesteps_to_predict]
+            test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-timesteps_to_predict].to(device)
             test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-timesteps_to_predict:].to("cpu").view(-1).detach().numpy()
             PP_test_slice = PP_test_data[:,i,...].view(L, 1, 5)[:L-timesteps_to_predict].to(device)
             pred = network.predict_long(test_slice_X, PP_test_slice, n_days=timesteps_to_predict).to("cpu").view(-1).detach().numpy()
@@ -93,7 +94,7 @@ class Pipeline():
             plt.scatter(np.arange(L-timesteps_to_predict,L), pred, color="C1", label="prediction")
             plt.scatter(np.arange(L-timesteps_to_predict,L), test_slice_y, color="C0", marker="x", label="ground truth")
             plt.legend()
-        plt.savefig('plots/lstm6.jpg')
+        plt.savefig(f'plots/{config_id}.jpg')
 
 if __name__ == '__main__':
 
@@ -114,12 +115,14 @@ if __name__ == '__main__':
     num_layers = 2
     dropout = 0.5
     learning_rate = 0.0001
-
-    num_epochs = 100
+    num_epochs = 200
     timesteps_to_predict = 5
+
+    # Config_id 
+    config_id = '09-21_v2_lstm'
 
     # Start evaluation
     pipeline = Pipeline(N=N, K=K, T=T, B=B, L=L, version=version, train_test_split=train_test_split, timesteps_to_predict=timesteps_to_predict, num_epochs=num_epochs, input_size=input_size, hidden_size=hidden_size, output_size=output_size, num_layers=num_layers, dropout=dropout, learning_rate=learning_rate, device="cuda" if torch.cuda.is_available() else "cpu")
-    pipeline.execute()
+    pipeline.execute(config_id)
 
     
