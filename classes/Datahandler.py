@@ -252,7 +252,7 @@ class Sampler():
         
         return batch,pandemic_parameters,starting_points
 
-    def __plotsubset____(self, L, K, B, T, starting_points, batch, max_num_plots=25, path="./plots/sampler.png"):
+    def __plot_subset____(self, L, K, B, T, starting_points, batch, max_num_plots=25, path="./plots/sampler.png"):
 
         #plot the slices
         x = np.arange(0,L)
@@ -266,8 +266,16 @@ class Sampler():
             plt.legend()
         plt.savefig(path)
 
+    def __save_to_file__(self, data, PP, path="./sampled_data.csv"):
+        data = data.cpu().numpy()
+        PP = PP.cpu().numpy()
+        all = pd.DataFrame([(PP[i],data[i]) for i in range(len(data))], columns=['pp','timeseries'])
+        all.to_csv(path)
 
-
+    def __load_from_file__(self, path="./sampled_data.csv"):
+        all = pd.read_csv(path)
+        data, PP = all['timeseries'], all['pp']
+        return data, PP 
 
 if __name__ == "__main__":
 
@@ -291,14 +299,13 @@ if __name__ == "__main__":
         "epsilon":0.5
     }
 
-    N = 10000 
+    N = 100 
     L = 20 #10
     K = 5
     B = 5
     T = 50
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
-
 
     #Random Sampler 
     #S = Sampler(lower_lims,upper_lims,1000,T,"V3","cpu")
@@ -309,8 +316,11 @@ if __name__ == "__main__":
     #Optimized Sampler 
     S = Sampler(lower_lims=None, upper_lims=None, N=N, T=T, version="V2", device=device)
     batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode="optimized")
-    S.__plotsubset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./plots/samplertest.png")
-
+    S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./plots/samplertest.png")
+    S.__save_to_file__(batch,pandemic_parameters,path=f"./sampled_data_N-{N}_K-{3}.csv")
+    data, PP = S.__load_from_file__(path=f"./sampled_data_N-{N}_K-{3}.csv")
+    print(data)
+    print(PP)
 
 '''
 #####################################################################################
