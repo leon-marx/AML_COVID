@@ -3,6 +3,7 @@ from torch import nn
 from Datahandler import DataHandler
 import matplotlib.pyplot as plt
 import numpy as np
+import Dataset
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -407,6 +408,7 @@ if __name__ == "__main__":
 
     # Data Generation
     print("Generating Data")
+    
     batch, pandemic_parameters, starting_points = mysampler(K, L, B)
     training_data = batch[:,:-test_batch_size,...]
     test_data = batch[:,-test_batch_size:,...]

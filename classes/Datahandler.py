@@ -83,7 +83,7 @@ class DataHandler():
         '''
 
         #return the full time series
-        if return_plain: return self.cumulative.numpy(), None
+        if return_plain: return self.cumulative, None #.cpu().numpy(), None 
         
         #Check if the selected length of the slices is valid
         if self.T <= L: raise(ValueError("Selected sequence lenght exceeds lenght of time series"))
@@ -299,13 +299,15 @@ if __name__ == "__main__":
         "epsilon":0.5
     }
 
-    N = 100 
+    N = 100 #10000
     L = 20 #10
-    K = 5
-    B = 5
+    K = 3 #1000
+    B = 2 #20
     T = 50
-
+    version = "V3"
+    mode = "optimized"
     device = "cuda" if torch.cuda.is_available() else "cpu"
+    path = f"./sampled_data_mode_{mode}_version_{version}_N-{N}_K-{K}.csv"
 
     #Random Sampler 
     #S = Sampler(lower_lims,upper_lims,1000,T,"V3","cpu")
@@ -314,11 +316,13 @@ if __name__ == "__main__":
     #starting_points = starting_points.detach().numpy()
 
     #Optimized Sampler 
-    S = Sampler(lower_lims=None, upper_lims=None, N=N, T=T, version="V2", device=device)
-    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode="optimized")
+    S = Sampler(lower_lims=lower_lims, upper_lims=upper_lims, N=N, T=T, version=version, device=device)
+    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode=mode)
+    batch = batch.detach().view(L,K*B).T
+    starting_points = starting_points.detach()
     S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./plots/samplertest.png")
-    S.__save_to_file__(batch,pandemic_parameters,path=f"./sampled_data_N-{N}_K-{3}.csv")
-    data, PP = S.__load_from_file__(path=f"./sampled_data_N-{N}_K-{3}.csv")
+    S.__save_to_file__(batch,pandemic_parameters,path=path)
+    data, PP = S.__load_from_file__(path=path)
     print(data)
     print(PP)
 

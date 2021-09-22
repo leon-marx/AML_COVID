@@ -7,7 +7,7 @@ import torch
 import pandas as pd
 
 class GridSearch_PP_finder():
-    def __init__(self, pp_grid, N_pop = 10000,version = "V2",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120):
+    def __init__(self, pp_grid, N_pop = 10000,version = "V3",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120):
         '''
         parameters:
             pp_grid                 grid for pp search space 
@@ -109,7 +109,7 @@ class GridSearch_PP_finder():
             print(f"PP: {pp} | MSE = {mse}")
 
             #Append 
-            results.append([pp,mse.cpu()])
+            results.append([self.simulation_parameters,float(mse.cpu().numpy())])
 
             # Break if max_eval
             if i > max_evals:
@@ -141,14 +141,17 @@ class GridSearch_PP_finder():
         plt.savefig(f"./gridsearch/plots/GS_fit_{country}_{params_real['wave']}.jpg")
         plt.close()
 
-        # save results
+        # save results to disk
         df_results = pd.DataFrame(results)
-        df_results.to_csv(f"./gridsearch/GS_fit_{country}_{params_real['wave']}.csv")
+        df_results.to_csv(f"./gridsearch/GS_fit_{country}_{params_real['wave']}.csv") 
 
 if __name__ == "__main__": 
 
 
     import json
+
+    N_pop = 100
+    simulation_version = 'V3'
 
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
@@ -171,13 +174,13 @@ if __name__ == "__main__":
 
             pp_grid = {
                 "epsilon": [0.1],
-                "D": [5], #[5,6,7,8,9,10,15,20], #list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
-                "r": [0.02], #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
+                "D": [5,6,7,8,9,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
+                "r": [0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
                 "d": [14], #[5], #list(np.linspace(5,10,6)),
-                "N_init": [5]# [5,10,15,20,30,40,50,60,70,80,90,100]
+                "N_init": [5,10,15,20,30,40,50,60,70,80,90,100]
             }
 
-            gs = GridSearch_PP_finder(pp_grid=pp_grid, iterations = 60)
+            gs = GridSearch_PP_finder(pp_grid=pp_grid, N_pop=N_pop, version=simulation_version, iterations = 60)
             gs(params_real)
 
             #gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)
