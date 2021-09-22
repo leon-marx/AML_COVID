@@ -61,8 +61,8 @@ class DataHandler():
             self.cumulative = torch.tensor(self.cumulative).to(device)
 
         elif mode == "SIR":
-            data = create_toydata(T = params["T"], I0= params["I0"], R0= params["R0"], N = params["N"], beta = params["beta"],gamma = params["gamma"])
-            self.cumulative = torch.tensor(data[:,1:3].sum(-1)).to(device)
+            Timeseries = create_toydata(T = params["T"], I0 = params["I0"], R0 = params["R0"], N = params["N"], beta = params["beta"], gamma = params["gamma"]).T
+            self.cumulative = torch.tensor((Timeseries[1]+Timeseries[2]) / params["N"]).to(device)
 
         else:
             raise(NotImplementedError("Select valid data source!"))
@@ -83,7 +83,7 @@ class DataHandler():
         '''
 
         #return the full time series
-        if return_plain: return self.cumulative, None #.numpy(),None
+        if return_plain: return self.cumulative.numpy(), None
         
         #Check if the selected length of the slices is valid
         if self.T <= L: raise(ValueError("Selected sequence lenght exceeds lenght of time series"))

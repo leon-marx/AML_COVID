@@ -18,9 +18,9 @@ def create_toydata(T, I0, R0, N, beta, gamma):
     def SIR_ode(y, t, N, beta, gamma):
         S, I, R = y
 
-        S_deriv = - beta * S * I / N  # susceptible
-        I_deriv = beta * S * I / N - gamma * I  # infected
-        R_deriv = gamma * I  # recovered
+        S_deriv = - beta * S * I  # susceptible
+        I_deriv = beta * S * I  - gamma * I  # infected
+        R_deriv = gamma * I # recovered
 
         y_deriv = S_deriv, I_deriv, R_deriv
         return y_deriv
@@ -36,20 +36,34 @@ def create_toydata(T, I0, R0, N, beta, gamma):
 
 
 
-# Example usage:
 """
-T = 100
-I0 = 5
+# Example usage:
+D = 8
+N = 1000
+r = 0.1
+d = 6
+N_init = 10
+T =100
+
+I0 = N_init
 R0 = 0
-N = 100
-beta = 0.4
-gamma = 0.25
+gamma = 1 / d
+beta = r * D / N
+
+print("beta = ",beta,"\tgamma = ",gamma)
 
 import matplotlib.pyplot as plt
+
 Timeseries = create_toydata(T, I0, R0, N, beta, gamma).T
 labels = ["Susceptible", "Infected", "Recovered"]
+
+
+
+
 for i, col in enumerate(Timeseries):
-    plt.plot(np.arange(len(col)), col, label=labels[i])
+   plt.plot(np.arange(len(col)), col, label=f"{labels[i]}, i = {i}")
+
 plt.legend()
 plt.show()
 """
+
