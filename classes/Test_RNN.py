@@ -21,7 +21,7 @@ lower_lims = {
     "D": 1,
     "r": 0.0,
     "d": 7,
-    "N_init": 0,
+    "N_init": 1,
     "epsilon": 0.0
 }
 upper_lims = {
@@ -36,26 +36,38 @@ T = 50  # length of the simulation
 version = "V3"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 K = 10  # number of simulations sampled from the PP ranges
-L = 20  # length of the slices
+L = 40  # length of the slices
 B = 10  # number of slices per simulation
 n_epochs = 10000
 learning_rate = 0.0001
 test_batch_size = 4
-n_days = 10  # number of days to predict for long predictions
+backtime = 20  # number of days the network gets to see before prediction
+foretime = 3  # number of days to predict for long predictions
+fast = False
+if fast:
+    N = 100
+    T = 50
+    K = 2
+    B = 2
+    L = 40
+    n_epochs = 1
 
 # Models
 print("Initializing Models")
+"""
 myrnn = RNN_Model.RNN(input_size=input_size,
                       hidden_size=hidden_size,
                       output_size=output_size,
                       num_layers=num_layers,
                       nonlinearity=nonlinearity)
+"""
 
 mylstm = LSTM_Model.LSTM(input_size=input_size,
                          hidden_size=hidden_size,
-                         output_size=output_size,
                          num_layers=num_layers,
-                         dropout=dropout)
+                         dropout=dropout,
+                         foretime=foretime,
+                         backtime=backtime)
 
 mysampler = Datahandler.Sampler(lower_lims=lower_lims,
                                 upper_lims=upper_lims,
@@ -73,19 +85,24 @@ training_PP = pandemic_parameters[:,:-test_batch_size,...]
 test_PP = pandemic_parameters[:,-test_batch_size:,...]
 
 # Ckeck Data Quality
-x = np.arange(L-1)
+"""
+x = np.arange(backtime)
+y = np.arange(backtime, backtime+foretime)
 plt.figure(figsize=(12, 8))
 for i in range(test_batch_size):
     plt.subplot(2, 2, i+1)
-    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
-    test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
-    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:L-1].to(device)
+    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:backtime]
+    test_slice_y = test_data[:,i,...].view(L, 1, -1)[backtime:backtime+foretime].to("cpu").view(-1).detach().numpy()
+    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:backtime].to(device)
     plt.plot(x, test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
-    plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.scatter(y, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.ylim((-0.1, 1.1))
     plt.legend()
 plt.show()
+"""
 
 # RNN Training
+"""
 print("Training RNN")
 myrnn.to(device)
 
@@ -96,6 +113,7 @@ for epoch in range(n_epochs):
     myrnn.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer)
     if epoch % 100 == 0:
         myrnn.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
+
 
 # Plotting RNN Predictions
 print("Plotting RNN Predictions")
@@ -110,6 +128,7 @@ for i in range(test_batch_size):
     plt.plot(x, test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
     plt.scatter(L, pred, color="C1", label="Prediction")
     plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.ylim((-0.1, 1.1))
     plt.legend()
 plt.savefig("RNN_Predictions.png")
 # plt.show()
@@ -127,10 +146,11 @@ for i in range(test_batch_size):
     plt.plot(x, test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
     plt.scatter(torch.arange(L, L+n_days), preds, color="C1", label="Prediction")
     plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.ylim((-0.1, 1.1))
     plt.legend()
 plt.savefig("RNN_Long_Predictions.png")
 # plt.show()
-
+"""
 # LSTM Training
 print("Training LSTM")
 mylstm.to(device)
@@ -138,41 +158,51 @@ mylstm.to(device)
 loss_fn = torch.nn.MSELoss()
 optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
 
-for epoch in range(n_epochs):
-    mylstm.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer)
-    if epoch % 100 == 0:
-        mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
+def training_loop():
+    for epoch in range(n_epochs):
+        print(f"Starting epoch {epoch}")
+        mylstm.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer)
+        if epoch % 100 == 0:
+            mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
+
+training_loop()
 
 # Plotting LSTM Predictions
+"""
 print("Plotting LSTM Predictions")
 x = np.arange(L-1)
 plt.figure(figsize=(12, 8))
 for i in range(test_batch_size):
     plt.subplot(2, 2, i+1)
-    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
-    test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
-    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:L-1].to(device)
+    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:backtime]
+    test_slice_y = test_data[:,i,...].view(L, 1, -1)[backtime:backtime+foretime].to("cpu").view(-1).detach().numpy()
+    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:backtime].to(device)
     pred = mylstm.predict(test_slice_X, PP_test_slice).to("cpu").view(-1).detach().numpy()
     plt.plot(x, test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
-    plt.scatter(L, pred, color="C1", label="Prediction")
-    plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.scatter(, pred, color="C1", label="Prediction")
+    plt.scatter(y, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.ylim((-0.1, 1.1))
     plt.legend()
 plt.savefig("LSTM_Predictions.png")
 # plt.show()
+"""
 
 # Plotting Long LSTM Predictions
 print("Plotting Long LSTM Predictions")
-x = np.arange(L-1)
+x = np.arange(backtime)
+y = np.arange(backtime, backtime+foretime)
 plt.figure(figsize=(12, 8))
 for i in range(test_batch_size):
     plt.subplot(2, 2, i+1)
-    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-1]
-    test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-1].to("cpu").view(-1).detach().numpy()
-    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:L-1].to(device)
-    preds = mylstm.predict_long(test_slice_X, PP_test_slice, n_days=n_days).to("cpu").view(-1).detach().numpy()
+    test_slice_X = test_data[:,i,...].view(L, 1, -1)[:backtime]
+    test_slice_y = test_data[:,i,...].view(L, 1, -1)[backtime:backtime+foretime].to("cpu").view(-1).detach().numpy()
+    PP_test_slice = test_PP[:,i,...].view(L, 1, 5)[:backtime].to(device)
+    preds = mylstm.predict_long(test_slice_X, PP_test_slice, n_days=foretime).to("cpu").view(-1).detach().numpy()
     plt.plot(x, test_slice_X.to("cpu").view(-1), color="C0", label="Test Set")
-    plt.scatter(torch.arange(L, L+n_days), preds, color="C1", label="Prediction")
-    plt.scatter(L, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.scatter(y, preds, color="C1", label="Prediction")
+    plt.scatter(y, test_slice_y, color="C0", marker="x", label="Truth")
+    plt.ylim((-0.1, 1.1))
     plt.legend()
 plt.savefig("LSTM_Long_Predictions.png")
-# plt.show()
+plt.show()
+torch.save(mylstm.state_dict(), "Trained_LSTM_Model")
