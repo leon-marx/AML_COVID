@@ -43,7 +43,7 @@ n_epochs = 10000
 learning_rate = 0.0001
 test_batch_size = 4
 backtime = 20  # number of days the network gets to see before prediction
-foretime = 5  # number of days to predict for long predictions
+foretime = 3  # number of days to predict for long predictions
 fast = False
 if fast:
     N = 100
