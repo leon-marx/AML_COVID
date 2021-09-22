@@ -8,7 +8,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class LSTM(nn.Module):
 
-    def __init__(self, input_size, hidden_size, num_layers, dropout):
+    def __init__(self, input_size, hidden_size, num_layers, dropout, foretime=10, backtime=20):
         """
         input_size: number of features in input, generally 1
         hidden_size: number of hidden neurons, e.g. 256
@@ -20,6 +20,8 @@ class LSTM(nn.Module):
         self.hidden_size = hidden_size
         self.num_layers = num_layers
         self.dropout = dropout
+        self.foretime = foretime
+        self.backtime = backtime
         self.lstm = nn.LSTM(input_size=self.input_size,
                           hidden_size=self.hidden_size,
                           num_layers=self.num_layers,
@@ -192,7 +194,7 @@ class LSTM(nn.Module):
         loss.backward()
         optimizer.step()
         if verbose:
-            print(f"Epoch: {epoch} | Training Loss:", loss.item())
+            print(f"Epoch: {epoch} | Training Loss:", loss)
 
     def train_model(self, training_data, training_PP, loss_fn, optimizer, epoch=None, verbose=False):
         """
@@ -216,36 +218,34 @@ class LSTM(nn.Module):
         """
         L = training_data.shape[0]
         N = training_data.shape[1]
-        BACKTIME = 20
-        FORETIME = 10
 
         # Put on GPU if possible
         training_data = training_data.to(device)
         training_PP = training_PP.to(device)
         
         # Split data into many slices
-        X_data = torch.zeros(size=(BACKTIME, N*(L-(BACKTIME+FORETIME)), self.input_size-5))
-        X_PP_data = torch.zeros(size=(BACKTIME, N*(L-(BACKTIME+FORETIME)), 5))
-        y_data = torch.zeros(size=(FORETIME, N*(L-(BACKTIME+FORETIME)), self.input_size-5))
-        for i in range(L-(BACKTIME+FORETIME)):
-            X = training_data[i:i+BACKTIME]
-            X_PP = training_PP[i:i+BACKTIME]
-            y = training_data[i+BACKTIME:i+BACKTIME+FORETIME]
+        X_data = torch.zeros(size=(self.backtime, N*(L-(self.backtime+self.foretime)), self.input_size-5))
+        X_PP_data = torch.zeros(size=(self.backtime, N*(L-(self.backtime+self.foretime)), 5))
+        y_data = torch.zeros(size=(self.foretime, N*(L-(self.backtime+self.foretime)), self.input_size-5))
+        for i in range(L-(self.backtime+self.foretime)):
+            X = training_data[i:i+self.backtime]
+            X_PP = training_PP[i:i+self.backtime]
+            y = training_data[i+self.backtime:i+self.backtime+self.foretime]
             X_data[:, i*N:(i+1)*N, :] = X
             X_PP_data[:, i*N:(i+1)*N, :] = X_PP
             y_data[:, i*N:(i+1)*N, :] = y
 
         # Predict value for next timestep and compute prediction error
         self.train()
-        pred = self.forward_long(X_data, X_PP_data, FORETIME)
-        loss = loss_fn(pred, y_data)
+        pred = self.forward_long(X_data, X_PP_data, self.foretime)
+        loss = loss_fn(pred, y_data).to(device)
 
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
         if verbose:
-            print(f"Epoch: {epoch} | Training Loss:", loss.item())
+            print(f"Epoch: {epoch} | Training Loss:", loss)
 
     def test_model(self, test_data, test_PP, loss_fn):
         """
@@ -266,21 +266,19 @@ class LSTM(nn.Module):
         """
         L = test_data.shape[0]
         N = test_data.shape[1]
-        BACKTIME = 20
-        FORETIME = 10
 
         # Put on GPU if possible
         test_data = test_data.to(device)
         test_PP = test_PP.to(device)
         
         # Split data into many slices
-        X_data = torch.zeros(size=(BACKTIME, N*(L-(BACKTIME+FORETIME)), self.input_size-5))
-        X_PP_data = torch.zeros(size=(BACKTIME, N*(L-(BACKTIME+FORETIME)), 5))
-        y_data = torch.zeros(size=(FORETIME, N*(L-(BACKTIME+FORETIME)), self.input_size-5))
-        for i in range(L-(BACKTIME+FORETIME)):
-            X = test_data[i:i+BACKTIME]
-            X_PP = test_PP[i:i+BACKTIME]
-            y = test_data[i+BACKTIME:i+BACKTIME+FORETIME]
+        X_data = torch.zeros(size=(self.backtime, N*(L-(self.backtime+self.foretime)), self.input_size-5))
+        X_PP_data = torch.zeros(size=(self.backtime, N*(L-(self.backtime+self.foretime)), 5))
+        y_data = torch.zeros(size=(self.foretime, N*(L-(self.backtime+self.foretime)), self.input_size-5))
+        for i in range(L-(self.backtime+self.foretime)):
+            X = test_data[i:i+self.backtime]
+            X_PP = test_PP[i:i+self.backtime]
+            y = test_data[i+self.backtime:i+self.backtime+self.foretime]
             X_data[:, i*N:(i+1)*N, :] = X
             X_PP_data[:, i*N:(i+1)*N, :] = X_PP
             y_data[:, i*N:(i+1)*N, :] = y
@@ -288,7 +286,7 @@ class LSTM(nn.Module):
         self.eval()
         with torch.no_grad():
             # Compute prediction error
-            pred = self.predict_long(X_data, X_PP_data, FORETIME)
+            pred = self.predict_long(X_data, X_PP_data, self.foretime)
             test_loss = loss_fn(pred, y_data).item()
         print("Average Test Loss:", test_loss)
 
