@@ -33,6 +33,7 @@ test_batch_size = 4
 foretime = 3
 backtime = 20
 n_epochs = 1000
+LOG_FOLDER = "Tuning_Logs"
 
 # Parameters to Tune
 hidden_size_list = [128, 256, 512]
@@ -81,7 +82,7 @@ def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
         if epoch % 100 == 0:
             test_loss = mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
             losses.append(test_loss)
-    with open(f"Tuning_Logs/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}.txt", "w") as file:
+    with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}.txt", "w") as file:
         for loss in losses:
             file.write(str(loss) + "\n")
     print("")
