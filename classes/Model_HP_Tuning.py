@@ -27,17 +27,17 @@ T = 50  # length of the simulation
 version = "V3"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 K = 10  # number of simulations sampled from the PP ranges
-L = 20  # length of the slices
+L = 40  # length of the slices
 B = 10  # number of slices per simulation
 test_batch_size = 4
 foretime = 3
 backtime = 20
-n_epochs = 1000
-LOG_FOLDER = "Tuning_Logs"
+n_epochs = 1#000
+LOG_FOLDER = "C:/Users/gooog/Desktop/log_backup/Tuning_Logs"
 
 # Parameters to Tune
 hidden_size_list = [128, 256, 512]
-num_layers_list = [1, 2, 4]
+num_layers_list = [1, 2]
 dropout_list = [0.0, 0.5]
 nonlinearity_list = ["tanh", "relu"]
 learning_rate_list = [0.00001, 0.0001, 0.001, 0.01]
@@ -84,13 +84,13 @@ def tune_rnn(hidden_size, num_layers, nonlinearity, learning_rate):
         if epoch % 100 == 0:
             test_loss = myrnn.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
             test_losses.append(test_loss)
-    with open(f"{LOG_FOLDER}/RNN-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity{nonlinearity}-learning_rate_{learning_rate}_train.txt", "w") as file:
+    with open(f"{LOG_FOLDER}/RNN-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity_{nonlinearity}-learning_rate_{learning_rate}_train.txt", "w") as file:
         for loss in train_losses:
             file.write(str(loss) + "\n")
-    with open(f"{LOG_FOLDER}/RNN-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity{nonlinearity}-learning_rate_{learning_rate}_test.txt", "w") as file:
+    with open(f"{LOG_FOLDER}/RNN-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity_{nonlinearity}-learning_rate_{learning_rate}_test.txt", "w") as file:
         for loss in test_losses:
             file.write(str(loss) + "\n")
-    torch.save(myrnn.state_dict(), f"{LOG_FOLDER}/RNN_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity{nonlinearity}-learning_rate_{learning_rate}")
+    torch.save(myrnn.state_dict(), f"{LOG_FOLDER}/RNN_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity_{nonlinearity}-learning_rate_{learning_rate}")
     print("")
     print("")
     print("")
@@ -121,13 +121,13 @@ def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
         if epoch % 100 == 0:
             test_loss = mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
             test_losses.append(test_loss)
-    with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}_train.txt", "w") as file:
+    with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout_{dropout}-learning_rate_{learning_rate}_train.txt", "w") as file:
         for loss in train_losses:
             file.write(str(loss) + "\n")
-    with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}_test.txt", "w") as file:
+    with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout_{dropout}-learning_rate_{learning_rate}_test.txt", "w") as file:
         for loss in test_losses:
             file.write(str(loss) + "\n")
-    torch.save(mylstm.state_dict(), f"{LOG_FOLDER}/LSTM_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}")
+    torch.save(mylstm.state_dict(), f"{LOG_FOLDER}/LSTM_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout_{dropout}-learning_rate_{learning_rate}")
     print("")
     print("")
     print("")
@@ -137,6 +137,12 @@ for hidden_size in hidden_size_list:
     for num_layers in num_layers_list:
         for learning_rate in learning_rate_list:
             for nonlinearity in nonlinearity_list:
-                tune_rnn(n_epochs, hidden_size, num_layers, nonlinearity, learning_rate)
+                try:
+                    tune_rnn(hidden_size, num_layers, nonlinearity, learning_rate)
+                except RuntimeError:
+                    continue
             for dropout in dropout_list:
-                tune_lstm(n_epochs, hidden_size, num_layers, dropout, learning_rate)
+                try:
+                    tune_lstm(hidden_size, num_layers, dropout, learning_rate)
+                except RuntimeError:
+                    continue
