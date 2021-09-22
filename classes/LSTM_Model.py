@@ -8,7 +8,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 
 class LSTM(nn.Module):
 
-    def __init__(self, input_size, hidden_size, num_layers, dropout, foretime=10, backtime=20):
+    def __init__(self, input_size, hidden_size, num_layers, dropout, foretime=3, backtime=20):
         """
         input_size: number of features in input, generally 1
         hidden_size: number of hidden neurons, e.g. 256
