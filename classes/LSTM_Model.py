@@ -353,73 +353,77 @@ class LSTM(nn.Module):
 # Example use
 if __name__ == "__main__":
 
-    print("Running on:", device)
+    import Datahandler
 
-    B = 500  # batch size
-    L = 20  # sequence length
-
-    params = {"N": 100,
-            "D": 10,
-            "r": 0.2,
-            "d": 14,
-            "N_init": 1,
-            "epsilon": 0.4,
-            "version": "V2",
-            "T": L + 1}
-            
-    DH = DataHandler(mode="Simulation", params=params, device=device)
-    data, starting_points, PP_data  = DH(B,L)
-    print("Data:            ", data.shape) #20,500,1
-    training_data = data[:,:350,...]
-    test_data = data[:,350:,...]
-    print("Training Data:   ", training_data.shape) #20,350,1
-    print("Test Data:       ", test_data.shape) #20,150,1
-
-    print("PP Data:         ", PP_data.shape) #20,500,5
-    PP_training_data = PP_data[:,:350,...]
-    PP_test_data = PP_data[:,350:,...]
-    print("PP Training Data:", PP_training_data.shape) #20,350,5
-    print("PP Test Data:    ", PP_test_data.shape) #20,150,5
-
+    # Parameters
     input_size = 1
     hidden_size = 256
+    output_size = 1
     num_layers = 2
     dropout = 0.5
-
-    n_epochs = 200
+    lower_lims = {
+        "D": 1,
+        "r": 0.0,
+        "d": 3,
+        "N_init": 1,
+        "epsilon": 0.0
+    }
+    upper_lims = {
+        "D": 10,
+        "r": 0.5,
+        "d": 21,
+        "N_init": 5,
+        "epsilon": 0.7
+    }
+    N = 1000  # population size
+    T = 50  # length of the simulation   AS BIG AS POSSIBLE WITHOUT FLAT
+    version = "V3"
+    device = "cuda" if torch.cuda.is_available() else "cpu"
+    K = 50  # number of simulations sampled from the PP ranges   AS BIG AS POSSIBLE
+    L = T - 5  # length of the slices
+    B = 5  # number of slices per simulation
+    n_epochs = 10000
     learning_rate = 0.0001
+    test_batch_size = 4
+    backtime = 20  # number of days the network gets to see before prediction
+    foretime = 3  # number of days to predict for long predictions
 
-    n_days = 5
+    # Models
+    print("Initializing Models")
+    mylstm = LSTM(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            dropout=dropout,
+                            foretime=foretime,
+                            backtime=backtime)
 
+    mysampler = Datahandler.Sampler(lower_lims=lower_lims,
+                                    upper_lims=upper_lims,
+                                    N=N,
+                                    T=T,
+                                    version=version,
+                                    device=device)
 
-    MyLSTM = LSTM(input_size=input_size, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout).to(device)
+    # Data Generation
+    print("Generating Data")
+    batch, pandemic_parameters, starting_points = mysampler(K, L, B)
+    training_data = batch[:,:-test_batch_size,...]
+    test_data = batch[:,-test_batch_size:,...]
+    training_PP = pandemic_parameters[:,:-test_batch_size,...]
+    test_PP = pandemic_parameters[:,-test_batch_size:,...]
 
-    # Print model and its parameters
+    # LSTM Training
+    print("Training LSTM")
+    mylstm.to(device)
 
-    for name, param in MyLSTM.named_parameters():
-        if param.requires_grad:
-            print(name)
-
-
-    loss_fn = nn.MSELoss()
-    optimizer = torch.optim.Adam(params=MyLSTM.parameters(), lr=learning_rate)
+    loss_fn = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
 
     for epoch in range(n_epochs):
-        MyLSTM.train_model(training_data=training_data,training_PP=PP_training_data, loss_fn=loss_fn, optimizer=optimizer, verbose=True, epoch=epoch)
-        if epoch % 20 == 0:
-            MyLSTM.test_model(test_data=test_data, test_PP=PP_test_data, loss_fn=loss_fn)
+        print(f"Starting epoch {epoch}")
+        mylstm.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer)
+        if epoch % 100 == 0:
+            mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
 
-    # get correct samples 
-
-    plt.figure(figsize=(12, 12))
-    for i in range(9):
-        plt.subplot(3, 3, i+1)
-        test_slice_X = test_data[:,i,...].view(L, 1, -1)[:L-n_days]
-        test_slice_y = test_data[:,i,...].view(L, 1, -1)[L-n_days:].to("cpu").view(-1).detach().numpy()
-        PP_test_slice = PP_test_data[:,i,...].view(L, 1, 5)[:L-n_days].to(device)
-        pred = MyLSTM.predict_long(test_slice_X, PP_test_slice, n_days=n_days).to("cpu").view(-1).detach().numpy()
-        plt.plot(np.arange(L-n_days), test_slice_X.to("cpu").view(-1).detach().numpy(), color="C0", label="Test Set")
-        plt.scatter(np.arange(L-n_days,L), pred, color="C1", label="prediction")
-        plt.scatter(np.arange(L-n_days,L), test_slice_y, color="C0", marker="x", label="ground truth")
-        plt.legend()
-    plt.savefig('plots/lstm4.jpg')
+    # Save Model
+    torch.save(mylstm.state_dict(), "Trained_LSTM_Model")
