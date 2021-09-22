@@ -3,6 +3,7 @@ import torch
 
 # Own Imports
 import Datahandler
+import RNN_Model
 import LSTM_Model
 
 # Fixed Parameters
@@ -38,6 +39,7 @@ LOG_FOLDER = "Tuning_Logs"
 hidden_size_list = [128, 256, 512]
 num_layers_list = [1, 2, 4]
 dropout_list = [0.0, 0.5]
+nonlinearity_list = ["tanh", "relu"]
 learning_rate_list = [0.00001, 0.0001, 0.001, 0.01]
 
 # Sampler Initialization
@@ -55,6 +57,43 @@ training_data = batch[:,:-test_batch_size,...]
 test_data = batch[:,-test_batch_size:,...]
 training_PP = pandemic_parameters[:,:-test_batch_size,...]
 test_PP = pandemic_parameters[:,-test_batch_size:,...]
+
+def tune_rnn(hidden_size, num_layers, nonlinearity, learning_rate):
+    # Model
+    print("Initializing Model with:")
+    print(f"    hidden_size: {hidden_size}")
+    print(f"    num_layers: {num_layers}")
+    print(f"    nonlinearity: {nonlinearity}")
+    print(f"    learning_rate: {learning_rate}")
+    myrnn = RNN_Model.RNN(input_size=input_size,
+                            hidden_size=hidden_size,
+                            num_layers=num_layers,
+                            nonlinearity=nonlinearity,
+                            foretime=foretime,
+                            backtime=backtime)
+    # RNN Training
+    print("Training RNN")
+    myrnn.to(device)
+    loss_fn = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(params=myrnn.parameters(), lr=learning_rate)
+    train_losses = []
+    test_losses = []
+    for epoch in range(n_epochs):
+        train_loss = myrnn.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer, verbose=True)
+        train_losses.append(train_loss)
+        if epoch % 100 == 0:
+            test_loss = myrnn.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
+            test_losses.append(test_loss)
+    with open(f"{LOG_FOLDER}/RNN-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity{nonlinearity}-learning_rate_{learning_rate}_train.txt", "w") as file:
+        for loss in train_losses:
+            file.write(str(loss) + "\n")
+    with open(f"{LOG_FOLDER}/RNN-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity{nonlinearity}-learning_rate_{learning_rate}_test.txt", "w") as file:
+        for loss in test_losses:
+            file.write(str(loss) + "\n")
+    torch.save(myrnn.state_dict(), f"{LOG_FOLDER}/RNN_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity{nonlinearity}-learning_rate_{learning_rate}")
+    print("")
+    print("")
+    print("")
 
 def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
     # Model
@@ -97,5 +136,7 @@ print("Running Loop")
 for hidden_size in hidden_size_list:
     for num_layers in num_layers_list:
         for learning_rate in learning_rate_list:
+            for nonlinearity in nonlinearity_list:
+                tune_rnn(n_epochs, hidden_size, num_layers, nonlinearity, learning_rate)
             for dropout in dropout_list:
                 tune_lstm(n_epochs, hidden_size, num_layers, dropout, learning_rate)
