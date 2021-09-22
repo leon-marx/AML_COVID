@@ -293,9 +293,14 @@ class LSTM(nn.Module):
 
         return test_loss
     
+    def load_model(self, path="Trained_LSTM_Model"):
+        return torch.load(path)
+
     
 # Example use
 if __name__ == "__main__":
+    
+
 
     import Datahandler
 
@@ -348,6 +353,10 @@ if __name__ == "__main__":
                                     version=version,
                                     device=device)
 
+    mylstm.load_state_dict(mylstm.load_model())
+    
+
+
     # Data Generation
     print("Generating Data")
     batch, pandemic_parameters, starting_points = mysampler(K, L, B)
@@ -355,12 +364,16 @@ if __name__ == "__main__":
     test_data = batch[:,-test_batch_size:,...]
     training_PP = pandemic_parameters[:,:-test_batch_size,...]
     test_PP = pandemic_parameters[:,-test_batch_size:,...]
+    
+    loss_fn = torch.nn.MSELoss()
+    mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
+
+'''
 
     # LSTM Training
     print("Training LSTM")
     mylstm.to(device)
-
-    loss_fn = torch.nn.MSELoss()
+    
     optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
 
     for epoch in range(n_epochs):
@@ -371,3 +384,6 @@ if __name__ == "__main__":
 
     # Save Model
     torch.save(mylstm.state_dict(), "Trained_LSTM_Model")
+    '''
+
+
