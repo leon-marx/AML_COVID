@@ -245,7 +245,8 @@ class LSTM(nn.Module):
         loss.backward()
         optimizer.step()
         if verbose:
-            print(f"Epoch: {epoch} | Training Loss:", loss)
+            # print(f"Epoch: {epoch} | Training Loss:", loss)
+            return loss.item()
 
     def test_model(self, test_data, test_PP, loss_fn):
         """

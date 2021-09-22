@@ -7,7 +7,6 @@ import LSTM_Model
 
 # Fixed Parameters
 input_size = 1
-output_size = 1
 lower_lims = {
     "D": 1,
     "r": 0.0,
@@ -66,7 +65,6 @@ def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
     print(f"    learning_rate: {learning_rate}")
     mylstm = LSTM_Model.LSTM(input_size=input_size,
                             hidden_size=hidden_size,
-                            output_size=output_size,
                             num_layers=num_layers,
                             dropout=dropout,
                             foretime=foretime,
@@ -76,15 +74,21 @@ def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
     mylstm.to(device)
     loss_fn = torch.nn.MSELoss()
     optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
-    losses = []
+    train_losses = []
+    test_losses = []
     for epoch in range(n_epochs):
-        mylstm.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer)
+        train_loss = mylstm.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer, verbose=True)
+        train_losses.append(train_loss)
         if epoch % 100 == 0:
             test_loss = mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
-            losses.append(test_loss)
-    with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}.txt", "w") as file:
-        for loss in losses:
+            test_losses.append(test_loss)
+    with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}_train.txt", "w") as file:
+        for loss in train_losses:
             file.write(str(loss) + "\n")
+    with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}_test.txt", "w") as file:
+        for loss in test_losses:
+            file.write(str(loss) + "\n")
+    torch.save(mylstm.state_dict(), f"{LOG_FOLDER}/LSTM_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout{dropout}-learning_rate_{learning_rate}")
     print("")
     print("")
     print("")
