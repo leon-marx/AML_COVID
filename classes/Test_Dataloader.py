@@ -26,9 +26,9 @@ upper_lims = {
 }
 N = 1000  # population size
 T = 50  # length of the simulation   AS BIG AS POSSIBLE WITHOUT FLAT
-version = "V3"
+version = "V2"
 device = "cuda" if torch.cuda.is_available() else "cpu"
-K = 50  # number of simulations sampled from the PP ranges   AS BIG AS POSSIBLE
+K = 500  # number of simulations sampled from the PP ranges   AS BIG AS POSSIBLE
 L = T - 5  # length of the slices
 B = 5  # number of slices per simulation
 backtime = 20  # number of days the network gets to see before prediction
@@ -44,15 +44,15 @@ mysampler = Datahandler.Sampler(
     version=version,
     device=device
 )
-# batch, pandemic_parameters, starting_points = mysampler(K, L, B)
-# torch.save(batch, "data_path.pt")
-# torch.save(pandemic_parameters[:,:,:5], "PP_path.pt")
+batch, pandemic_parameters, starting_points = mysampler(K, L, B)
+torch.save(batch, "data_path.pt")
+torch.save(pandemic_parameters[:,:,:5], "PP_path.pt")
 
 # Loading data divided into train and test set
 # batch = torch.load("data_path.pt")
-# pandemic_parameters = torch.load("PP_path.pt")
-# print(pandemic_parameters.shape)
-batch_length = 250
+pandemic_parameters = torch.load("PP_path.pt")
+print(pandemic_parameters.shape)
+batch_length = pandemic_parameters.shape[1]
 train_inds, test_inds = torch.utils.data.random_split(
     torch.arange(batch_length), 
     [int(batch_length*train_ratio), batch_length - int(batch_length*train_ratio)], 
