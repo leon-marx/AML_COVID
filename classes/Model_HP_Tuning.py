@@ -10,36 +10,16 @@ import LSTM_Model
 
 # Fixed Parameters
 input_size = 1
-lower_lims = {
-    "D": 1,
-    "r": 0.001,
-    "d": 3,
-    "N_init": 1,
-    "epsilon": 0.0,
-    "D_new": 1,
-    "r_new": 0.001,
-    "T_change_D": 0
-}
-upper_lims = {
-    "D": 10,
-    "r": 0.7,
-    "d": 21,
-    "N_init": 5,
-    "epsilon": 0.7,
-    "D_new": 10,
-    "r_new": 0.7,
-    "T_change_D": 50
-}
-version = "V3"
+DATA_PATH = "data_path.pt"
+PP_PATH = "pp_path.pt"
 device = "cuda" if torch.cuda.is_available() else "cpu"
-test_batch_size = 4
 foretime = 3
 backtime = 20
-n_epochs = 1
+n_epochs = 1000
 LOG_FOLDER = "Tuning_Logs"
-batch_length = 250
+batch_length = 2500
 train_ratio = 0.7
-batch_size = 16
+batch_size = 2048
 random_seed = 17
 
 # Parameters to Tune
@@ -65,8 +45,8 @@ def my_collate(batch):
         y[:, i, :] = item[2]
     return x, pp, y
 
-training_data = Dataset.Dataset("data_path.pt", "PP_path.pt", train_inds, backtime=backtime, foretime=foretime)
-test_data = Dataset.Dataset("data_path.pt", "PP_path.pt", test_inds, backtime=backtime, foretime=foretime)
+training_data = Dataset.Dataset(DATA_PATH, PP_PATH, train_inds, backtime=backtime, foretime=foretime)
+test_data = Dataset.Dataset(DATA_PATH, PP_PATH, test_inds, backtime=backtime, foretime=foretime)
 training_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
 test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
 

@@ -9,6 +9,7 @@ from Toydata import create_toydata
 from ast import literal_eval
 import json
 import ast
+import tqdm
 
 
 class DataHandler():
@@ -222,7 +223,7 @@ class Sampler():
             pandemic_parameters = torch.zeros([B*K,9]).to(self.device) #order: (N, D, r, d, epsilon)
             starting_points = torch.zeros([B*K]).to(self.device)
 
-            for i in range(K):
+            for i in tqdm.tqdm(range(K)):
                 #smooth transition or not
                 params_simulation["Smooth_transition"] = torch.randint(low=0,high=2,size = [1]).item()
 

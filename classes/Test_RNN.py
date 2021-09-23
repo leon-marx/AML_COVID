@@ -17,41 +17,16 @@ hidden_size = 256
 num_layers = 2
 nonlinearity = "tanh"
 dropout = 0.5
-lower_lims = {
-    "D": 1,
-    "r": 0.001,
-    "d": 3,
-    "N_init": 1,
-    "epsilon": 0.0,
-    "D_new": 1,
-    "r_new": 0.001,
-    "T_change_D": 0
-}
-upper_lims = {
-    "D": 10,
-    "r": 0.7,
-    "d": 21,
-    "N_init": 5,
-    "epsilon": 0.7,
-    "D_new": 10,
-    "r_new": 0.7,
-    "T_change_D": 50
-}
-N = 1000  # population size
-T = 50  # length of the simulation
-version = "V3"
 device = "cuda" if torch.cuda.is_available() else "cpu"
-K = 10  # number of simulations sampled from the PP ranges
-L = 40  # length of the slices
-B = 10  # number of slices per simulation
-n_epochs = 1000
+n_epochs = 100
 learning_rate = 0.0001
-test_batch_size = 4
 backtime = 20  # number of days the network gets to see before prediction
 foretime = 3  # number of days to predict for long predictions
 batch_length = 250
 train_ratio = 0.7
 batch_size = 16
+DATA_PATH = "data_path.pt"
+PP_PATH = "PP_path.pt"
 
 # Models
 print("Initializing Models")
@@ -85,8 +60,8 @@ def my_collate(batch):
         y[:, i, :] = item[2]
     return x, pp, y
 
-training_data = Dataset.Dataset("data_path.pt", "PP_path.pt", train_inds, backtime=backtime, foretime=foretime)
-test_data = Dataset.Dataset("data_path.pt", "PP_path.pt", test_inds, backtime=backtime, foretime=foretime)
+training_data = Dataset.Dataset(DATA_PATH, PP_PATH, train_inds, backtime=backtime, foretime=foretime)
+test_data = Dataset.Dataset(DATA_PATH, PP_PATH, test_inds, backtime=backtime, foretime=foretime)
 training_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
 test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
 
