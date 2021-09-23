@@ -6,8 +6,8 @@ from numpy.lib.function_base import select
 import torch
 import time
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-print("Device used: ",device)
+#device = "cuda" if torch.cuda.is_available() else "cpu"
+#print("Device used: ",device)
 
 #######################################################################################################################
 #important:
@@ -38,17 +38,18 @@ class World():
         self.d = d #duration of the infection
         self.N_init = N_init #Numbefr of persons infected at t = 0
         self.version = version
+        self.device = device
 
         if version == "V1":
             #initialize the population. This array cintains the infection state of each individual
-            self.P = torch.ones(self.N).to(device)
+            self.P = torch.ones(self.N).to(self.device)
 
             #Get the initail infected persons randomly
-            indices = torch.randperm(self.N)[:self.N_init].to(device)
-            self.P[indices] = torch.ones(self.N_init).to(device) * 2
+            indices = torch.randperm(self.N)[:self.N_init].to(self.device)
+            self.P[indices] = torch.ones(self.N_init).to(self.device) * 2
 
             #initialize the social network
-            self.Network = torch.zeros((self.N,self.N)).to(device)
+            self.Network = torch.zeros((self.N,self.N)).to(self.device)
 
             #Connect to the direct neighbors
             for i in range(self.N):
@@ -69,16 +70,16 @@ class World():
 
                 mask = mask_1 * mask_2
                 
-                possible_indices = torch.arange(self.N).to(device)[mask]
+                possible_indices = torch.arange(self.N).to(self.device)[mask]
                 diff = int(self.D - sums[i])
-                indices = possible_indices[torch.randperm(len(possible_indices)).to(device)][:min(diff,len(possible_indices))]
+                indices = possible_indices[torch.randperm(len(possible_indices)).to(self.device)][:min(diff,len(possible_indices))]
 
                 for u in indices:
                     self.Network[i][u] = 1
                     self.Network[u][i] = 1
 
             #Counter how long a person has been infected
-            self.duration = torch.zeros(self.N).to(device)
+            self.duration = torch.zeros(self.N).to(self.device)
 
         elif version == "V2":
             if N % 2 != 0: raise ValueError("select even populationsize!")
@@ -93,10 +94,10 @@ class World():
 
 
             #initialize the population. This array cintains the infection state of each individual
-            self.P = torch.ones(self.N).to(device)
+            self.P = torch.ones(self.N).to(self.device)
 
             #initialize the social network
-            self.Network = torch.zeros((self.N,self.N)).to(device)
+            self.Network = torch.zeros((self.N,self.N)).to(self.device)
 
             if eval == True:
                 rows_subplots = 2
@@ -108,8 +109,8 @@ class World():
                 self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="A")
 
             #Get the initail infected persons randomly
-            indices = torch.randperm(self.N)[:self.N_init].to(device)
-            self.P[indices] = torch.ones(self.N_init).to(device) * 2
+            indices = torch.randperm(self.N)[:self.N_init].to(self.device)
+            self.P[indices] = torch.ones(self.N_init).to(self.device) * 2
 
             if eval == True:
                 #randomly select infected individuals
@@ -131,7 +132,7 @@ class World():
                     self.Network[i][(i+int(D // 2) +1 )%self.N] = 1
                     self.Network[(i+int(D // 2) +1 )%self.N][i] = 1 #Symmetry added
 
-            mask_originally_connected = self.Network.clone().to(device)
+            mask_originally_connected = self.Network.clone().to(self.device)
 
             #Plot nice images for visualization of the init process
             if eval == True:
@@ -146,10 +147,10 @@ class World():
                 mask_original = mask_originally_connected[i]
                 
                 #mask the entries for this individuum that are not zero, and can there for be flipped
-                mask_possible = self.Network[i].clone().to(device)
+                mask_possible = self.Network[i].clone().to(self.device)
 
                 #Get a random selection to decide if a connection is flipped
-                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(device)
+                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(self.device)
 
                 #Get the connections that are flipped
                 mask = mask_original * mask_possible * mask_random
@@ -205,25 +206,25 @@ class World():
             self.N = N
 
             #initialize the population. This array cintains the infection state of each individual
-            self.P = torch.ones(self.N).to(device)
+            self.P = torch.ones(self.N).to(self.device)
 
             #Get the initail infected persons randomly
-            indices = torch.randperm(self.N)[:self.N_init].to(device)
-            self.P[indices] = torch.ones(self.N_init).to(device) * 2
+            indices = torch.randperm(self.N)[:self.N_init].to(self.device)
+            self.P[indices] = torch.ones(self.N_init).to(self.device) * 2
 
             #initialize the social network
-            self.Network = torch.zeros((self.N,self.N)).to(device)
+            self.Network = torch.zeros((self.N,self.N)).to(self.device)
             self.Network[-(int(D // 2) +1):,:(int(D // 2) +1)] = torch.tril(torch.ones([(int(D // 2) +1),(int(D // 2) +1)]))
             self.Network[:int(D // 2),-int(D // 2):] = torch.tril(torch.ones([int(D // 2),int(D // 2)]))
 
             #Connect to the D nearest neighbors
             for i in range(1,int(D // 2)+1):
-                self.Network += torch.Tensor(np.eye(N,k=i)).to(device)
-                self.Network += torch.Tensor(np.eye(N,k=-i)).to(device)
+                self.Network += torch.Tensor(np.eye(N,k=i)).to(self.device)
+                self.Network += torch.Tensor(np.eye(N,k=-i)).to(self.device)
 
             #Handle the case that D is odd
             if D % 2 != 0:
-                self.Network += torch.Tensor(np.eye(N,k=int(D // 2)+1)).to(device)
+                self.Network += torch.Tensor(np.eye(N,k=int(D // 2)+1)).to(self.device)
 
             mask_originally_connected = self.Network
 
@@ -247,7 +248,7 @@ class World():
                 mask_possible = self.Network[i]
 
                 #Get a random selection to decide if a connectio is flipped
-                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(device)
+                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(self.device)
 
                 #Get the connections that are flipped
                 mask = mask_original * mask_possible * mask_random
@@ -307,10 +308,10 @@ class World():
 
 
             #initialize the population. This array cintains the infection state of each individual
-            self.P = torch.ones(self.N).to(device)
+            self.P = torch.ones(self.N).to(self.device)
 
             #initialize the social network
-            self.Network = torch.zeros((self.N,self.N)).to(device)
+            self.Network = torch.zeros((self.N,self.N)).to(self.device)
 
             if eval == True:
                 rows_subplots = 2
@@ -322,8 +323,8 @@ class World():
                 self.plotter(matrix = self.Network,cols_subplots=cols_subplots,rows_subplots=rows_subplots,subplot_index=1,title="A")
 
             #Get the initail infected persons randomly
-            indices = torch.randperm(self.N)[:self.N_init].to(device)
-            self.P[indices] = torch.ones(self.N_init).to(device) * 2
+            indices = torch.randperm(self.N)[:self.N_init].to(self.device)
+            self.P[indices] = torch.ones(self.N_init).to(self.device) * 2
 
             if eval == True:
                 #randomly select infected individuals
@@ -345,7 +346,7 @@ class World():
                     self.Network[i][(i+int(D[i] // 2) +1 )%self.N] = 1
                     self.Network[(i+int(D[i] // 2) +1 )%self.N][i] = 1 #Symmetry added
 
-            mask_originally_connected = self.Network.clone().to(device)
+            mask_originally_connected = self.Network.clone().to(self.device)
 
             #Plot nice images for visualization of the init process
             if eval == True:
@@ -360,10 +361,10 @@ class World():
                 mask_original = mask_originally_connected[i]
                 
                 #mask the entries for this individuum that are not zero, and can there for be flipped
-                mask_possible = self.Network[i].clone().to(device)
+                mask_possible = self.Network[i].clone().to(self.device)
 
                 #Get a random selection to decide if a connection is flipped
-                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(device)
+                mask_random = torch.where(torch.rand(self.N) < self.e, 1,0).to(self.device)
 
                 #Get the connections that are flipped
                 mask = mask_original * mask_possible * mask_random
@@ -409,7 +410,7 @@ class World():
                 if eval == True and file is not None: plt.savefig(file)
 
         #Counter how long a person has been infected
-        self.duration = torch.zeros(self.N).to(device)
+        self.duration = torch.zeros(self.N).to(self.device)
             
     def __call__(self,change_now = False,D_new = None,r_new = None):
         '''
@@ -465,19 +466,19 @@ class World():
         mask_infected = (self.P == 2)
 
         #Only keep the relevant parts of th esocial network, meaning the contacts of teh infected persons
-        reduced_network = torch.zeros((self.N,self.N)).to(device)
+        reduced_network = torch.zeros((self.N,self.N)).to(self.device)
         reduced_network[mask_infected] = self.Network[mask_infected]
 
         #print(reduced_network.sum(-1))
 
         #Get a set of uniform random numbers to determin if a person would be infected or not
-        mask_probs = (torch.rand((self.N,self.N)).to(device) <= self.r)
+        mask_probs = (torch.rand((self.N,self.N)).to(self.device) <= self.r)
 
         #combine the differnt masks
         mask = mask_susceptible * reduced_network.bool() * mask_probs
 
         #Sum over the colums, to determine, if a suceptible is infected now
-        got_infected = torch.where(mask.sum(0) > 0, 1, 0).bool().to(device)
+        got_infected = torch.where(mask.sum(0) > 0, 1, 0).bool().to(self.device)
 
         #update the state of the infected Plotter
         self.P[got_infected] = 2
