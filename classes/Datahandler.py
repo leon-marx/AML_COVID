@@ -25,7 +25,7 @@ class DataHandler():
 
         if mode == "Simulation":
             #initialize the small world network
-            W = World(N = params["N"], D = params["D"], r = params["r"], d = params["d"], N_init= params["N_init"],epsilon=params["epsilon"],version = params["version"])
+            W = World(N = params["N"], D = params["D"], r = params["r"], d = params["d"], N_init= params["N_init"],epsilon=params["epsilon"],version = params["version"], device=self.device)
             self.PP_data = torch.Tensor([params["N"], params["D"], params["r"], params["d"], params["epsilon"]])
 
             #Generate the full time series:
