@@ -6,9 +6,11 @@ import GPy
 import scipy
 import optunity
 import torch 
+import time 
 
 class GP_PP_finder():
-    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1,0,0,0.0,0,0]),upper_lims = np.array([0.5,15,0.25,10,20,15,0.5,20,1]),N_pop = 500,version = "V3",device = "cuda" if torch.cuda.is_available() else "cpu",iterations = 120):
+
+    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1,0,0,0.0,0,0]),upper_lims = np.array([0.5,15,0.25,10,20,15,0.5,20,1]),N_pop = 10000,version = "V3",device = "cpu",iterations = 120):
         '''
         parameters:
             params_real             Paramters describing the real time series
@@ -51,7 +53,7 @@ class GP_PP_finder():
 
         return torch.mean(mse)
 
-    def get_time_series(self,mode,parameters,device = "cuda" if torch.cuda.is_available() else "cpu"):
+    def get_time_series(self,mode,parameters,device = "cpu"):
         '''
         Get the time series used in the optimization and shape it as required
 
@@ -81,7 +83,7 @@ class GP_PP_finder():
 
     def __call__(self,params_real):
         #Get the real time series
-        ts_real = self.get_time_series("Real",params_real,device = "cuda" if torch.cuda.is_available() else "cpu")
+        ts_real = self.get_time_series("Real",params_real,device = "cpu")
 
         #Get the number of the time steps
         T = len(ts_real)
@@ -116,7 +118,7 @@ class GP_PP_finder():
             self.simulation_parameters["epsilon"] = epsilon
 
             #Get the simulated time series
-            ts_simulation = self.get_time_series("Simulation",self.simulation_parameters,device = "cuda" if torch.cuda.is_available() else "cpu")
+            ts_simulation = self.get_time_series("Simulation",self.simulation_parameters,device = "cpu")
 
             #Get the mse between the simulation and the real time series
             mse = self.cost(ts_real[S:] - ts_real[S],ts_simulation)
@@ -176,7 +178,7 @@ class GP_PP_finder():
             
 
             #Get the simulated time series
-            ts_simulation = self.get_time_series("Simulation",self.simulation_parameters,device = "cuda" if torch.cuda.is_available() else "cpu")
+            ts_simulation = self.get_time_series("Simulation",self.simulation_parameters,device = "cpu")
 
             print(len(ts_simulation),len(ts_real))
 
@@ -213,12 +215,13 @@ class GP_PP_finder():
         self.simulation_parameters["epsilon"] = optimal_pp[0]
         self.T = self.simulation_parameters["T"] = T - int(optimal_pp[4])
 
+
         self.simulation_parameters["Smooth_transition"] = int(q_opt["x9"])
         self.simulation_parameters["D_new"] = int(q_opt["x6"])
         self.simulation_parameters["r_new"] = q_opt["x7"]
         self.simulation_parameters["T_change_D"] = int(q_opt["x8"])
 
-        ts_optimal = self.get_time_series("Simulation",self.simulation_parameters,device = "cuda" if torch.cuda.is_available() else "cpu")
+        ts_optimal = self.get_time_series("Simulation",self.simulation_parameters,device = "cpu")
 
         plt.figure(figsize=(20,10))
         x_val = np.arange(int(optimal_pp[4]),T)
