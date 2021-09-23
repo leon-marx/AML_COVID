@@ -30,22 +30,29 @@ class DataHandler():
 
             #Generate the full time series:
             self.cumulative = torch.zeros([params["T"]]).to(self.device)
+            smooth_check = False
             for i in range(params["T"]):
                 #Stp if the desired lengh is reached, to handle the extra loop in case of smooth transition
                 if self.cumulative[-1] != 0: break
 
                 #Change the Pandemic parameters
-                if i == params["T_change_D"]:
+                if i >= params["T_change_D"]:
                     #Smooth the transition of the degree, by decreasing it step by step
                     if params["Smooth_transition"] == 1:
                         for j in range(1,params["D"]-params["D_new"]+1):
+                            # print(i+j-1)
                             self.cumulative[i+j-1] = W(change_now=True,D_new = params["D"] - j,r_new = params["r_new"])
+                            smooth_check = True
                     #Hard change of D -> D_new
                     else:
                         self.cumulative[i] = W(change_now=True,D_new=params["D_new"],r_new = params["r_new"])
 
                 else:
-                    self.cumulative[i] = W()
+                    if smooth_check:
+                        print(i+params["D"]-params["D_new"])
+                        self.cumulative[i+params["D"]-params["D_new"]] = W()
+                    else:
+                        self.cumulative[i] = W()
 
         elif mode == "Real":
 
