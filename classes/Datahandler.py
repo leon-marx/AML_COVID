@@ -33,15 +33,21 @@ class DataHandler():
             smooth_check = False
             for i in range(params["T"]):
                 #Stp if the desired lengh is reached, to handle the extra loop in case of smooth transition
-                if self.cumulative[-1] != 0: break
+                if self.cumulative[-1] != 0:
+                    break
 
                 #Change the Pandemic parameters
-                if i >= params["T_change_D"]:
+                if i == params["T_change_D"]:
                     #Smooth the transition of the degree, by decreasing it step by step
                     if params["Smooth_transition"] == 1:
-                        for j in range(1,params["D"]-params["D_new"]+1):
+                        range_upper_lim = params["D"]-params["D_new"]
+                        if range_upper_lim == 0:
+                            self.cumulative[i] = W(change_now=True,D_new = params["D"],r_new = params["r_new"])
+                        for j in range(0,range_upper_lim):
+                            if self.cumulative[-1] != 0:
+                                break
                             # print(i+j-1)
-                            self.cumulative[i+j-1] = W(change_now=True,D_new = params["D"] - j,r_new = params["r_new"])
+                            self.cumulative[i+j] = W(change_now=True,D_new = params["D"] - (j+1),r_new = params["r_new"])
                             smooth_check = True
                     #Hard change of D -> D_new
                     else:
@@ -49,8 +55,7 @@ class DataHandler():
 
                 else:
                     if smooth_check:
-                        print(i+params["D"]-params["D_new"])
-                        self.cumulative[i+params["D"]-params["D_new"]] = W()
+                        self.cumulative[i+params["D"]-params["D_new"]-1] = W()
                     else:
                         self.cumulative[i] = W()
 
@@ -220,15 +225,20 @@ class Sampler():
                     #integer variables
                     if k == "N_init" or k == "D" or k == "D_new" or k == "T_change_D": 
                         params_simulation[k] = int(np.random.uniform(self.lower_lims[k],self.upper_lims[k]))
-
                     #float variables
                     else:
                         params_simulation[k] = np.random.uniform(self.lower_lims[k],self.upper_lims[k])
+                params_simulation["D_new"] = min(params_simulation["D"], params_simulation["D_new"])
+                params_simulation["r_new"] = min(params_simulation["r"], params_simulation["r_new"])
 
                 #Get the simulation
                 DH = DataHandler("Simulation",params_simulation,device=self.device)
 
                 #Sample from the Data handler
+                b,_ = DH(B = None,L = None,return_plain=True)
+                b = b.to("cpu")
+                plt.plot(b)
+                # plt.show()
                 b,sp,PP= DH(B,L) #returns batch with shape [L,B,1]
                 
                 batch[i * B:(i+1) * B] = b.squeeze().T
@@ -343,11 +353,11 @@ if __name__ == "__main__":
     lower_lims = {
         "D":1,
         "D_new":1,
-        "r_new":0.0,
+        "r_new":0.001,
         "T_change_D":0,
-        "r":0.0,
+        "r":0.001,
         "d":7,
-        "N_init":0,
+        "N_init":1,
         "epsilon":0.0
     }
 
@@ -386,8 +396,8 @@ if __name__ == "__main__":
     S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./plots/samplertest.png")
     S.__save_to_file__(N=N, K=K, B=B, L=L, T=T, version=version, mode=mode, batch=batch,pp=pandemic_parameters,path=path)
     batch_recov, pp_recov = S.__load_from_file__(L=L, path=path)
-    print(batch_recov)
-    print(pp_recov)
+    # print(batch_recov)
+    # print(pp_recov)
 
 
 def compare_hard_smooth_transition():

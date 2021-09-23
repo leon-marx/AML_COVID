@@ -424,7 +424,8 @@ class World():
         #Change the infection rate and the degree of the model
         if change_now == True:
             #cahnge the infection rate
-            self.r = r_new
+            self.r = min(self.r, r_new)
+            self.D = min(self.D, D_new)
 
             #change the degree by reducing the degree of individuals with an degree higher then the new degree
             if self.version == "V2":
@@ -443,8 +444,6 @@ class World():
                         #delete the selected connections
                         self.Network[i,contacts[indices]] = 0
                         self.Network[contacts[indices],i] = 0
-
-                self.D = D_new
 
             elif self.version == "V3":
                 pass
