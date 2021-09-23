@@ -85,10 +85,6 @@ class DataHandler():
             if params["use_running_average"] == True:
                 self.cumulative = self.get_running_average(self.cumulative,params["dt_running_average"])
 
-            
-            
-            self.cumulative = torch.tensor(self.cumulative).to(device)
-
             self.cumulative = torch.tensor(self.cumulative).to(device) 
             self.cumulative -= self.cumulative[0].item()
             self.cumulative /= self.cumulative[-1].item()
