@@ -10,7 +10,7 @@ import time
 
 class GP_PP_finder():
 
-    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1,0,0,0.0,0,0]),upper_lims = np.array([0.5,15,0.25,10,20,15,0.5,20,1]),N_pop = 10000,version = "V3",device = "cpu",iterations = 120):
+    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1,0,0,0.0,0,0]),upper_lims = np.array([0.5,15,0.25,10,20,15,0.5,20,1]),N_pop = 1000,version = "V2",device = "cpu",iterations = 120):
         '''
         parameters:
             params_real             Paramters describing the real time series
@@ -34,7 +34,7 @@ class GP_PP_finder():
         self.simulation_parameters = {
             "N":N_pop,
             "d":14,
-            "version":"V3"
+            "version":"V2"
         }
 
     def cost(self,ts_1,ts_2):
@@ -180,8 +180,6 @@ class GP_PP_finder():
             #Get the simulated time series
             ts_simulation = self.get_time_series("Simulation",self.simulation_parameters,device = "cpu")
 
-            print(len(ts_simulation),len(ts_real))
-
             #Get the mse
             mse = self.cost(ts_real[S:] - ts_real[S],ts_simulation).reshape(-1,1)
             
@@ -249,7 +247,7 @@ if __name__ == "__main__":
         "dt_running_average":14
     }
 
-    gp = GP_PP_finder(N_initial_PP_samples = 2,iterations = 2)
+    gp = GP_PP_finder(N_initial_PP_samples = 25,iterations = 50)
     
     optimal_simulation_parameters = gp(params_real)
 
