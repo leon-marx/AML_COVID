@@ -3,6 +3,7 @@ from torch import nn
 from Datahandler import DataHandler
 import matplotlib.pyplot as plt
 import numpy as np
+import Dataset
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -84,7 +85,7 @@ class LSTM(nn.Module):
                 new_PP_seq = torch.cat((pred, PP_input[-1].view(1, PP_input.shape[1], 5)), dim=2)
                 preds[i] = pred
             else:
-                pred, (h_final, c_final)= self.forward(new_PP_seq, inits=(h_final, c_final), full=True)
+                pred, (h_final, c_final) = self.forward(new_PP_seq, inits=(h_final, c_final), full=True)
                 new_PP_seq = torch.cat((pred, PP_input[-1].view(1, PP_input.shape[1], 5)), dim=2)
                 preds[i] = pred
         return preds
@@ -133,7 +134,7 @@ class LSTM(nn.Module):
         """
         sequence = sequence.to(device)
         PP_input = PP_input.to(device)
-        preds = torch.zeros(size=(n_days, sequence.shape[1], self.input_size-5), requires_grad=True)
+        preds = torch.zeros(size=(n_days, sequence.shape[1], self.input_size-5))
         for i in range(n_days):
             PP_sequence = torch.cat((sequence, PP_input), dim=2) #19,1,6 (number of days, ..., 6 dimensions [5PP,1value]); 10,1,6
             self.eval()
@@ -145,7 +146,7 @@ class LSTM(nn.Module):
                     new_PP_seq = torch.cat((pred, PP_input[-1].view(1, PP_input.shape[1], 5)), dim=2)
                     preds[i] = pred
                 else:
-                    pred, (h_final, c_final)= self.forward(new_PP_seq, inits=(h_final, c_final), full=True)
+                    pred, (h_final, c_final) = self.forward(new_PP_seq, inits=(h_final, c_final), full=True)
                     new_PP_seq = torch.cat((pred, PP_input[-1].view(1, PP_input.shape[1], 5)), dim=2)
                     preds[i] = pred
         return preds
@@ -293,66 +294,14 @@ class LSTM(nn.Module):
 
         return test_loss
     
-    '''
-    def test_model_long(self, test_data, test_PP, loss_fn, n_days):
-        """
-        test_data: should be a time series of shape (L, N, input_size) with:
-            L: sequence length, e.g. 50 days
-            N: batch_size
-            input_size: as above, generally 1
-        test_PP: pandemic parameters, tensor of shape (L, N, input_size) with:
-            L: sequence length, e.g. 50 days
-            N: batch_size
-            5: the 5 different PP-values:
-                N_pop: population size
-                D: average degree of social network in population
-                r: daily transmission rate between two individuals which were in contact
-                d: duration of the infection
-                epsilon: rate of cross-contacts
-        loss_fn: use the loss functions provided by pytorch
-        """
-        # divide into training (X) and validation set 
-        test_data = test_data.to(device)
-        test_PP = test_PP.to(device)
-        X_data = test_data[:-n_days]
-        y_data = test_data[-n_days:]
-        X_PP = test_PP[:-n_days]
-        #test_seq = torch.cat((X_data, X_PP), dim=2)
-        
-        test_loss = 0
+    def load_model(self, path="Trained_LSTM_Model"):
+        return torch.load(path)
 
-        self.eval()
-        with torch.no_grad():
-            # Compute prediction error
-            h_0 = self.get_h0(X_PP[0]).view(self.num_layers, X_PP.shape[1], self.hidden_size)
-            c_0 = self.get_c0(X_PP[0]).view(self.num_layers, X_PP.shape[1], self.hidden_size)
-            pred = self.forward(test_seq, inits=(h_0, c_0))
-            test_loss = loss_fn(pred, y_data).item()
-        print("Average Test Loss:", test_loss)
-        return torch.Tensor(preds)
-
-        preds = []
-        L = test_seq.shape[0]
-        for i in range(n_days):
-            PP_sequence = torch.cat((X_data, X_PP), dim=2)
-            self.eval()
-            with torch.no_grad():
-                # Compute prediction error
-                h_0 = self.get_h0(X_PP[0]).view(self.num_layers, X_PP.shape[1], self.hidden_size)
-                c_0 = self.get_c0(X_PP[0]).view(self.num_layers, X_PP.shape[1], self.hidden_size)
-                pred = self.forward(PP_sequence, inits=(h_0, c_0))
-                preds.append(pred)
-                PP_sequence = torch.cat((PP_sequence, pred), dim=0)[-n_days:]
-                X_PP = torch.cat((X_PP, X_PP[-1].view(1, -1, 5)), dim=0)[-n_days:]
-        
-        test_loss = loss_fn(preds, y_data).item()
-
-    return test_loss
-    '''
-        
-
+    
 # Example use
 if __name__ == "__main__":
+    
+
 
     import Datahandler
 
@@ -405,26 +354,38 @@ if __name__ == "__main__":
                                     version=version,
                                     device=device)
 
+    mylstm.load_state_dict(mylstm.load_model())
+    
+
+
     # Data Generation
     print("Generating Data")
+    
     batch, pandemic_parameters, starting_points = mysampler(K, L, B)
     training_data = batch[:,:-test_batch_size,...]
     test_data = batch[:,-test_batch_size:,...]
     training_PP = pandemic_parameters[:,:-test_batch_size,...]
     test_PP = pandemic_parameters[:,-test_batch_size:,...]
+    
+    loss_fn = torch.nn.MSELoss()
+    mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
+
+'''
 
     # LSTM Training
     print("Training LSTM")
     mylstm.to(device)
-
-    loss_fn = torch.nn.MSELoss()
+    
     optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
 
     for epoch in range(n_epochs):
         print(f"Starting epoch {epoch}")
-        mylstm.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer)
+        mylstm.train_model(training_data=training_data, training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer)
         if epoch % 100 == 0:
             mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
 
     # Save Model
     torch.save(mylstm.state_dict(), "Trained_LSTM_Model")
+    '''
+
+

@@ -1,38 +1,43 @@
+import copy
 from Datahandler import DataHandler
 import matplotlib.pyplot as plt
 import numpy as np
 import itertools
 from operator import itemgetter
-import torch 
+import torch
+import random
 import pandas as pd
 
 class GridSearch_PP_finder():
-    def __init__(self, pp_grid, N_pop = 10000,version = "V2",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120):
+    def __init__(self, pp_grid, eval_num = 100, N_pop = 10000, version = "V3",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120, mode="random"):
         '''
         parameters:
-            pp_grid                 grid for pp search space 
+            pp_grid                 grid for pp search space with epsilon D,r,d,N_init
             params_real             Paramters describing the real time series
             N_pop                   Number of individuals in the small world model
             version                 Version of the Small world model                
             device                  Device
             iterations              Number of iterations to find the optimal pandemic parameters
+            mode                    if "random" -> sample pps in intervals specified in pp_grid
+                                    if "full_grid" -> use cartesian product of pp specified in pp_grid
         '''
+        assert all(key in pp_grid for key in ['epsilon','d','D','r','N_init'])
+        self.mode = mode
+        self.eval_num = eval_num
         self.pp_grid = pp_grid
         self.version = version
         self.device = device
         self.iterations = iterations
-
         self.simulation_parameters = {
             "N":N_pop,
-            "d":14,
-            "version":"V2" #TODO V3
+            "version": version
         }
 
         # Print number of combinations 
         com = 1
         for x in self.pp_grid.values():
             com *= len(x)
-        print(f"Number of combinations: {com}")
+        print(f"Number of possible combinations: {com}")
 
     def cost(self,ts_1,ts_2):
         '''
@@ -83,18 +88,23 @@ class GridSearch_PP_finder():
         #Get the real time series
         ts_real = self.get_time_series("Real", params_real)
  
-        #Get the number of the time steps
+        #Get the number of time steps
         T = len(ts_real)
 
         # try all pp combinations
         keys, values = zip(*self.pp_grid.items())
+        pp_combinations = list(itertools.product(*values))
+        if(self.mode == "random"):
+            pp_combinations = random.sample(pp_combinations,self.eval_num)
         i = 0
         results = list()
+        print(f"Number of evaluated combinations: {len(pp_combinations)}")
 
-        for v in itertools.product(*values):
+        for v in pp_combinations:
 
             # Parse pp
             pp = dict(zip(keys, v))
+            self.simulation_parameters['d'] = pp['d']
             self.simulation_parameters['D'] = pp['D']
             self.simulation_parameters['r'] = pp['r']
             self.simulation_parameters['N_init'] = pp['N_init']
@@ -109,13 +119,13 @@ class GridSearch_PP_finder():
             print(f"PP: {pp} | MSE = {mse}")
 
             #Append 
-            results.append([pp,mse.cpu()])
+            current_simulation_parameters = copy.deepcopy(self.simulation_parameters)
+            results.append([current_simulation_parameters, float(mse.cpu().numpy())])
 
             # Break if max_eval
             if i > max_evals:
                 break
-        
-
+    
         # Sort by mse-loss
         results.sort(key=itemgetter(1), reverse=True)
 
@@ -141,14 +151,19 @@ class GridSearch_PP_finder():
         plt.savefig(f"./gridsearch/plots/GS_fit_{country}_{params_real['wave']}.jpg")
         plt.close()
 
-        # save results
+        # save results to disk
         df_results = pd.DataFrame(results)
-        df_results.to_csv(f"./gridsearch/GS_fit_{country}_{params_real['wave']}.csv")
+        df_results.to_csv(f"./gridsearch/GS_fit_{country}_{params_real['wave']}.csv") 
 
 if __name__ == "__main__": 
 
 
     import json
+
+    N_pop = 10000
+    simulation_version = 'V3'
+    eval_num = 200
+    mode = "random"
 
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
@@ -169,15 +184,23 @@ if __name__ == "__main__":
                 "dt_running_average":14
             }
 
-            pp_grid = {
+            pp_grid_old = {
                 "epsilon": [0.1],
-                "D": [5], #[5,6,7,8,9,10,15,20], #list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
-                "r": [0.02], #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
-                "d": [14], #[5], #list(np.linspace(5,10,6)),
-                "N_init": [5]# [5,10,15,20,30,40,50,60,70,80,90,100]
+                "D": [5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
+                "r": [0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
+                "d": list(np.linspace(5,10,6)),
+                "N_init": [5,10,20,50,80,100]
             }
 
-            gs = GridSearch_PP_finder(pp_grid=pp_grid, iterations = 60)
+            pp_grid = {
+                "epsilon": list(np.linspace(0.05,0.2, 4)), #[0.1],
+                "D": list(np.linspace(5,10,6,dtype=int)), # [5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
+                "r": list(np.linspace(0.01,0.2,20)), #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(0.01,0.2,19)), #[0.05], #list(np.linspace(0.05,0.2,4)),
+                "d": list(np.linspace(5,10,6,dtype=int)),
+                "N_init": list(np.linspace(5,100,20,dtype=int)) #[5,10,20,50,80,100]
+            }
+
+            gs = GridSearch_PP_finder(pp_grid=pp_grid, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, iterations = 60)
             gs(params_real)
 
             #gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)

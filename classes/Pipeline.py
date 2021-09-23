@@ -50,7 +50,7 @@ class Pipeline():
         # Create samples from Simulation and store a subset for control
         S = Sampler(lower_lims=None, upper_lims=None, N=self.N, T=self.T, version=self.version, device=self.device)
         data,PP_data,starting_points = S(K=K,L=L,B=B,mode="optimized")
-        S.__plotsubset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=data, path=f"./results/{self.config_id}/samplertest.png")
+        S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=data, path=f"./results/{self.config_id}/samplertest.png")
 
         # Split training and test data 
         training_data = data[:int(np.floor(B*K*(1-train_test_split))),...].transpose(0,1).unsqueeze(dim=2) #TODO typically batch-size at index 0?
@@ -86,6 +86,8 @@ class Pipeline():
 
         # Get sampled time-series from Simulation based on optimized PP's
         training_data, test_data, PP_training_data, PP_test_data = self.__getdata__()
+        training_generator, validation_generator, test_generator = =self.training_classes)
+
 
         # Network Training
         network, loss_fn, optimizer = self.__initnetwork__()

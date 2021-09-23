@@ -9,14 +9,14 @@ import torch
 import time 
 
 class GP_PP_finder():
-    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1]),upper_lims = np.array([0.5,15,0.25,10]),N_pop = 10000,version = "V3",device = "cpu",iterations = 120):
+
+    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1,0,0,0.0,0,0]),upper_lims = np.array([0.5,15,0.25,10,20,15,0.5,20,1]),N_pop = 10000,version = "V3",device = "cpu",iterations = 120):
         '''
         parameters:
             params_real             Paramters describing the real time series
             N_initial_PP_samples    Number of samples used to initialize the gp
-            lower_lims              Lower limits of the initial pandemic parameters [epsilon,degree,infection_rate,N_init]
-            upper_lims              Upper limits of the initial pandemic parameters [epsilon,degree,infection_rate,N_init]
-            N_pop                   Number of individuals in the small world model
+            lower_lims              Lower limits of the initial pandemic parameters [epsilon,degree,infection_rate,N_ini,S,D_new,r_new,T_change_D,Smooth_transition]
+            upper_lims              Upper limits of the initial pandemic parameters [epsilon,degree,infection_rate,N_init,S,D_new,r_new,T_change_D,Smooth_transition]
             version                 Version of the Small world model                +
             device                  Device
             iterations              Number of iterations to find the optimal pandemic parameters
@@ -28,6 +28,8 @@ class GP_PP_finder():
         self.version = version
         self.device = device
         self.iterations = iterations
+
+        print(len(self.upper_lims),len(self.lower_lims))
 
         self.simulation_parameters = {
             "N":N_pop,
@@ -87,22 +89,28 @@ class GP_PP_finder():
         T = len(ts_real)
         
         #Sample the initial pandemic parameters from a sobol sequnce
-        pandemic_parammeters = np.zeros([self.N_initial_PP_samples,5])
+        pandemic_parammeters = np.zeros([self.N_initial_PP_samples,9])
         costs = np.zeros(self.N_initial_PP_samples)
 
         print("\tGet the initial samples for the GP...")
 
         #Add the starting point for the evaluation to the limits
-        self.upper_lims = np.concatenate((self.upper_lims,np.array([int(T / 2)])))
-        self.lower_lims = np.concatenate((self.lower_lims,np.array([0])))
+        #self.upper_lims = np.concatenate((self.upper_lims,np.array([int(T / 2)])))
+        #self.lower_lims = np.concatenate((self.lower_lims,np.array([0])))
 
         for i in range(self.N_initial_PP_samples):
-            epsilon,D,r,N_init,S = sobol_seq.i4_sobol(5,i)[0] * (self.upper_lims - self.lower_lims) + self.lower_lims
+            epsilon,D,r,N_init,S,D_new,r_new,T_change_D,Smooth_transition = sobol_seq.i4_sobol(9,i)[0] * (self.upper_lims - self.lower_lims) + self.lower_lims
             S = int(S)
 
-            pandemic_parammeters[i] = np.array([epsilon,int(D),r,int(N_init),S])
+            #[epsilon,degree,infection_rate,N_ini,S,D_new,r_new,T_change_D,Smooth_transition]
+            pandemic_parammeters[i] = np.array([epsilon,int(D),r,int(N_init),S,int(D_new),r_new,int(T_change_D),int(Smooth_transition)])
 
             #Get the simulation for the corresponding pandemic parameters
+            self.simulation_parameters["Smooth_transition"] = Smooth_transition
+            self.simulation_parameters["D_new"] = int(D_new)
+            self.simulation_parameters["r_new"] = int(r_new)
+            self.simulation_parameters["T_change_D"] = int(T_change_D)
+
             self.simulation_parameters["D"] = int(D)
             self.simulation_parameters["r"] = r
             self.simulation_parameters["N_init"] = int(N_init)
@@ -122,7 +130,7 @@ class GP_PP_finder():
         print("\n")
 
         #define the kernel
-        k = GPy.kern.RBF(5) + GPy.kern.White(5)
+        k = GPy.kern.RBF(9) + GPy.kern.White(9)
 
         #initialize the GP
         GP = GPy.models.GPRegression(pandemic_parammeters,costs,kernel = k)
@@ -145,13 +153,13 @@ class GP_PP_finder():
             u = std * (gamma * scipy.stats.norm.cdf(gamma) + scipy.stats.norm.pdf(gamma))
             return u
 
-        def func(x1,x2,x3,x4,x5):
-            return expected_improvement(np.array([[x1,x2,x3,x4,x5]]))
+        def func(x1,x2,x3,x4,x5,x6,x7,x8,x9):
+            return expected_improvement(np.array([[x1,x2,x3,x4,x5,x6,x7,x8,x9]]))
 
         print("\tFinding optimal pp...")
         for j in range(self.iterations):
 
-            lims = {"x1":[self.lower_lims[0],self.upper_lims[0]],"x2":[self.lower_lims[1],self.upper_lims[1]],"x3":[self.lower_lims[2],self.upper_lims[2]],"x4":[self.lower_lims[3],self.upper_lims[3]],"x5":[self.lower_lims[4],self.upper_lims[4]]}
+            lims = {"x1":[self.lower_lims[0],self.upper_lims[0]],"x2":[self.lower_lims[1],self.upper_lims[1]],"x3":[self.lower_lims[2],self.upper_lims[2]],"x4":[self.lower_lims[3],self.upper_lims[3]],"x5":[self.lower_lims[4],self.upper_lims[4]],"x6":[self.lower_lims[5],self.upper_lims[5]],"x7":[self.lower_lims[6],self.upper_lims[6]],"x8":[self.lower_lims[7],self.upper_lims[7]],"x9":[self.lower_lims[8],self.upper_lims[8]]}
             q_opt, _,_ = optunity.maximize(func,num_evals = 1000,**lims)
 
             #Get the time series for the new proposal parameters
@@ -159,6 +167,12 @@ class GP_PP_finder():
             self.simulation_parameters["r"] = q_opt["x3"]
             self.simulation_parameters["N_init"] = int(q_opt["x4"])
             self.simulation_parameters["epsilon"] = q_opt["x1"]
+
+            self.simulation_parameters["D_new"] = int(q_opt["x6"])
+            self.simulation_parameters["r_new"] = q_opt["x7"]
+            self.simulation_parameters["T_change_D"] = int(q_opt["x8"])
+            self.simulation_parameters["Smooth_transition"] = int(q_opt["x9"])
+
             S = int(q_opt["x5"])
             self.simulation_parameters["T"] = T - S
             
@@ -173,7 +187,7 @@ class GP_PP_finder():
             
             #Add to the training set
             costs = np.concatenate((costs,mse),axis = 0)
-            pandemic_parammeters = np.concatenate((pandemic_parammeters,np.array([q_opt["x1"],int(q_opt["x2"]),q_opt["x3"],int(q_opt["x4"]),int(q_opt["x5"])]).reshape(-1,5)),axis = 0)
+            pandemic_parammeters = np.concatenate((pandemic_parammeters,np.array([q_opt["x1"],int(q_opt["x2"]),q_opt["x3"],int(q_opt["x4"]),int(q_opt["x5"]),int(q_opt["x6"]),q_opt["x7"],int(q_opt["x8"]),int(q_opt["x9"])]).reshape(-1,9)),axis = 0)
 
             #train a new GP on the new training set
             #initialize the GP
@@ -201,6 +215,12 @@ class GP_PP_finder():
         self.simulation_parameters["epsilon"] = optimal_pp[0]
         self.T = self.simulation_parameters["T"] = T - int(optimal_pp[4])
 
+
+        self.simulation_parameters["Smooth_transition"] = int(q_opt["x9"])
+        self.simulation_parameters["D_new"] = int(q_opt["x6"])
+        self.simulation_parameters["r_new"] = q_opt["x7"]
+        self.simulation_parameters["T_change_D"] = int(q_opt["x8"])
+
         ts_optimal = self.get_time_series("Simulation",self.simulation_parameters,device = "cpu")
 
         plt.figure(figsize=(20,10))
@@ -209,7 +229,7 @@ class GP_PP_finder():
 
         plt.plot(ts_real,label = "observation")
         country = params_real["file"].split(".")[0]
-        plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}, S = {int(optimal_pp[4])}")
+        plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}, S = {int(optimal_pp[4])}\nD_new = {self.simulation_parameters['D_new']}, r_new = {self.simulation_parameters['r_new']}, Smooth_transition = {self.simulation_parameters['Smooth_transition']}, T_change_D = {self.simulation_parameters['T_change_D']}")
 
         plt.legend()
         plt.savefig(f"./Images_GP_fit/{country}_{params_real['wave']}.jpg")
@@ -229,7 +249,7 @@ if __name__ == "__main__":
         "dt_running_average":14
     }
 
-    gp = GP_PP_finder(N_initial_PP_samples = 50,iterations = 100)
+    gp = GP_PP_finder(N_initial_PP_samples = 2,iterations = 2)
     
     optimal_simulation_parameters = gp(params_real)
 
