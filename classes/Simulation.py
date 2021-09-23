@@ -1,6 +1,7 @@
 from sys import version
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.core.numeric import indices
 from numpy.lib.function_base import select
 import torch
 import time
@@ -29,12 +30,14 @@ class World():
     Note:
         In this implementatio, it is possible, that a person can be infected by multiple persons in a single time step
     '''
+
     def __init__(self,N = 50,D = 8,r = 0.2,d = 14,N_init = 5,epsilon = 0.1,version = "V2",device="cuda" if torch.cuda.is_available() else "cpu",eval = False,file = None):
         self.N = N #Size of teh populatio
         self.D = D #Degree, number of contact persons
         self.r = r #Rate of passing th einfection to an susceptible neighbor with in one day
         self.d = d #duration of the infection
         self.N_init = N_init #Numbefr of persons infected at t = 0
+        self.version = version
 
         if version == "V1":
             #initialize the population. This array cintains the infection state of each individual
@@ -408,9 +411,47 @@ class World():
         #Counter how long a person has been infected
         self.duration = torch.zeros(self.N).to(device)
             
-
-    def __call__(self):
+    def __call__(self,change_now = False,D_new = None,r_new = None):
+        '''
+        parameters:
+            flip_now:   Change in the Degree and the infection rate in the current call
+            D_new:      New degree
+            r_new:      New infection rate
+        
+        '''
         tic = time.perf_counter()
+
+        #Change the infection rate and the degree of the model
+        if change_now == True:
+            #cahnge the infection rate
+            self.r = r_new
+
+            #change the degree by reducing the degree of individuals with an degree higher then the new degree
+            if self.version == "V2":
+                for i in range(self.N):
+                    #is the current degree bigger then the new oneß
+                    if self.Network[i].sum() > D_new:
+                        #select the current contacts 
+                        mask = torch.where(self.Network[i] == 1,True,False)
+
+                        #get the indices of the current contacts
+                        contacts = torch.arange(self.N)[mask]
+
+                        #select the ccontacts that are no longer connected
+                        indices = torch.randperm(len(contacts))[D_new:]
+
+                        #delete the selected connections
+                        self.Network[i,contacts[indices]] = 0
+                        self.Network[contacts[indices],i] = 0
+
+                self.D = D_new
+
+            elif self.version == "V3":
+                pass
+
+            else:
+                raise(NotImplemented("Select version that allows changing the pandemic parameters!"))
+
         #This function performs an time step of the small world
         #1) Update the number of infected days
         self.duration[self.P == 2.0] += 1
@@ -588,9 +629,64 @@ def compare_V2_V3(reps,sets):
 
     plt.savefig("compare_V2_V3_empirically.jpg")
 
+def visualize_reduced_degree_network(version,r_new = 0.2,D_new = 3,T_change = 5,T = 10):
+    W = World(N = 14,D = 7,r = 0.1,epsilon=0.1,version = version)
 
+    #visualize
+    plt.figure(figsize = (30,15))
+    W.plotter(W.Network,cols_subplots=2,rows_subplots=1,subplot_index=1,title=f"D = {W.D}")
 
-        
+    #change
+    W(True,D_new,r_new)
+
+    #visualize
+    W.plotter(W.Network,cols_subplots=2,rows_subplots=1,subplot_index=2,title=f"D = {W.D}")
+
+    plt.savefig("change_degree_network.jpg")
+
+def visualize_reduced_degree_pandemic_dynamics(version,T_change = 10):
+
+    #initialize the world
+    W_reduced = World(N = 1500,D=10,r = 0.1,N_init=5,version=version)
+    W_normal = World(N = 1500,D=10,r = 0.1,N_init=5,version=version)
+
+    fs = 30
+    T = 30
+
+    cases_rdeuced_D = []
+    cases_normal = []
+    
+    for i in range(0,30):
+
+        #reduce the degree
+        if i == T_change:
+            print("now")
+            c = W_reduced(True,3,0.1).item()
+        else:
+            c = W_reduced().item()
+
+        cases_rdeuced_D.append(c)
+
+        #without changing
+        a = W_normal().item()
+        cases_normal.append(a)
+
+    plt.figure(figsize = (20,10))
+    plt.plot(cases_rdeuced_D, linewidth=6, label = "reduced degree")
+    plt.plot(cases_normal, linewidth=6, label = "constant degree")
+
+    plt.xlabel("time [days]",fontsize = fs)
+    plt.ylabel("cumulative cases []",fontsize = fs)
+    plt.xticks(fontsize = fs)
+    plt.yticks(fontsize = fs)
+    plt.xlim([-1,T])
+    plt.ylim([0,1.2])
+    plt.legend(fontsize = fs)
+
+    plt.savefig(f"./pandemic_dynamics_{version}_reduced_degree.jpg")
+
+    plt.show()
+
 if __name__ == "__main__":
 
     # Parameters for the simulation 
@@ -619,4 +715,4 @@ if __name__ == "__main__":
     plt.savefig('plots/sim.jpg')
     plt.close()
 
-    # compare_V2_V3(reps = 25,sets = 9)  
+    # compare_V2_V3(reps = 25,sets = 9)
