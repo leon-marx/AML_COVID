@@ -14,23 +14,28 @@ import RNN_Model
 # Parameters
 input_size = 1
 hidden_size = 256
-output_size = 1
 num_layers = 2
 nonlinearity = "tanh"
 dropout = 0.5
 lower_lims = {
     "D": 1,
-    "r": 0.0,
-    "d": 7,
+    "r": 0.001,
+    "d": 3,
     "N_init": 1,
-    "epsilon": 0.0
+    "epsilon": 0.0,
+    "D_new": 1,
+    "r_new": 0.001,
+    "T_change_D": 0
 }
 upper_lims = {
-    "D": 5,
-    "r": 0.5,
+    "D": 10,
+    "r": 0.7,
     "d": 21,
-    "N_init": 20,
-    "epsilon": 0.5
+    "N_init": 5,
+    "epsilon": 0.7,
+    "D_new": 10,
+    "r_new": 0.7,
+    "T_change_D": 50
 }
 N = 1000  # population size
 T = 50  # length of the simulation
