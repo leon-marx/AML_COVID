@@ -33,7 +33,7 @@ test_batch_size = 4
 foretime = 3
 backtime = 20
 n_epochs = 1000
-LOG_FOLDER = "C:/Users/gooog/Desktop/log_backup/Tuning_Logs"
+LOG_FOLDER = "Tuning_Logs"
 
 # Parameters to Tune
 hidden_size_list = [128, 256, 512]
