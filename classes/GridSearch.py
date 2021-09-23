@@ -182,9 +182,9 @@ if __name__ == "__main__":
 
     import json
 
-    N_pop = 1000
+    N_pop = 2500
     simulation_version = 'V2'
-    eval_num = 10
+    eval_num = 1500
     mode =  "random" #"full_grid"
 
     with open("./classes/Countries/wave_regions.json","r") as file:
@@ -217,15 +217,15 @@ if __name__ == "__main__":
             }
 
             pp_grid_reduced = {
-                "epsilon": [0.1],
-                "D": [5,8,10], #[5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
-                "D_new": [5,8,10],
-                "r": [0.01, 0.02, 0.05], #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
-                "r_new": [0.01, 0.02, 0.05],
-                "d": list(np.linspace(5,10,6)),
-                "N_init": [5,10], # 20,50,80,100]
+                "epsilon": [0.01,0.05,0.1],
+                "D": [1,2,3,4,5,6,7,8,9,10], #[5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
+                "D_new": [1,2,3,4,5,6,7,8,9,10],
+                "r": [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1], #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
+                "r_new": [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1],
+                "d": list(np.linspace(5,6,7)),
+                "N_init": [1,2,3,4,5,6,7,8,9,10], # 20,50,80,100]
                 "T_change_D":[10,15,20,25,30],
-                "Smooth_transition":[0,1],
+                "Smooth_transition":[1e4]
             }
 
             pp_grid = {
