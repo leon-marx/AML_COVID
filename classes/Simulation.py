@@ -8,12 +8,12 @@ import time
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 print("Device used: ",device)
-'''
-######################################################################
-important:
 
-Currently, only version "V2" works correctly!
-'''
+#######################################################################################################################
+#important:
+#
+#Currently, only version "V2" works correctly!
+#######################################################################################################################
 
 
 class World():
@@ -538,6 +538,10 @@ class World():
 
         toc = time.perf_counter()
         # print(f"Plotter: {toc - tic:0.4f} seconds")
+
+#######################################################################################################################
+#Evaluation
+#######################################################################################################################
 
 #Get plots illustrating the initialization of the small wordl model, currently only availlable for V2
 def visualize_init(version):

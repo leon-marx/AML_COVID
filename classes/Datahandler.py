@@ -31,7 +31,21 @@ class DataHandler():
             #Generate the full time series:
             self.cumulative = torch.zeros([params["T"]]).to(self.device)
             for i in range(params["T"]):
-                self.cumulative[i] = W()
+                #Stp if the desired lengh is reached, to handle the extra loop in case of smooth transition
+                if self.cumulative[-1] != 0: break
+
+                #Change the Pandemic parameters
+                if i == params["T_change_D"]:
+                    #Smooth the transition of the degree, by decreasing it step by step
+                    if params["Smooth_transition"] == 1:
+                        for j in range(1,params["D"]-params["D_new"]+1):
+                            self.cumulative[i+j-1] = W(change_now=True,D_new = params["D"] - j,r_new = params["r_new"])
+                    #Hard change of D -> D_new
+                    else:
+                        self.cumulative[i] = W(change_now=True,D_new=params["D_new"],r_new = params["r_new"])
+
+                else:
+                    self.cumulative[i] = W()
 
         elif mode == "Real":
 
@@ -63,6 +77,10 @@ class DataHandler():
         elif mode == "SIR":
             Timeseries = create_toydata(T = params["T"], I0 = params["I0"], R0 = params["R0"], N = params["N"], beta = params["beta"], gamma = params["gamma"]).T
             self.cumulative = torch.tensor((Timeseries[1]+Timeseries[2]) / params["N"]).to(device)
+
+            #Normalize with the final value of the real data
+            self.cumulative /= self.cumulative[-1]
+
 
         else:
             raise(NotImplementedError("Select valid data source!"))
@@ -141,7 +159,6 @@ class DataHandler():
 
         return running_averag
 
-
 class Sampler():
     def __init__(self,lower_lims,upper_lims,N,T,version,device):
         '''
@@ -183,16 +200,21 @@ class Sampler():
         params_simulation["T"] = self.T
 
         if mode == "random":
-            
             batch = torch.zeros([B*K,L]).to(self.device)
-            pandemic_parameters = torch.zeros([B*K,5]).to(self.device) #order: (N, D, r, d, epsilon)
+            pandemic_parameters = torch.zeros([B*K,9]).to(self.device) #order: (N, D, r, d, epsilon)
             starting_points = torch.zeros([B*K]).to(self.device)
 
             for i in range(K):
+                #smooth transition or not
+                params_simulation["Smooth_transition"] = torch.randint(low=0,high=2,size = [1]).item()
+
                 #Sample the Pandemic parameters randomly from a uniform distribution
                 for k in self.lower_lims.keys():
-                    if k == "N_init" or k == "D":
+                    #integer variables
+                    if k == "N_init" or k == "D" or k == "D_new" or k == "T_change_D": 
                         params_simulation[k] = int(np.random.uniform(self.lower_lims[k],self.upper_lims[k]))
+
+                    #float variables
                     else:
                         params_simulation[k] = np.random.uniform(self.lower_lims[k],self.upper_lims[k])
 
@@ -204,7 +226,7 @@ class Sampler():
                 
                 batch[i * B:(i+1) * B] = b.squeeze().T
 
-                pandemic_parameters[i * B:(i+1) * B] = torch.tensor([params_simulation["N"], params_simulation["D"],params_simulation["r"],params_simulation["d"],params_simulation["epsilon"]])[None,:]
+                pandemic_parameters[i * B:(i+1) * B] = torch.tensor([params_simulation["N"], params_simulation["D"],params_simulation["r"],params_simulation["d"],params_simulation["epsilon"],params_simulation["D_new"],params_simulation["r_new"],params_simulation["T_change_D"],params_simulation["Smooth_transition"]])[None,:]
                 starting_points[i * B : (i+1) * B] = torch.tensor(sp)
                 # print(sp)
 
@@ -241,6 +263,7 @@ class Sampler():
                 pp_combination["N"] = params_simulation["N"]
                 pp_combination["T"] = params_simulation["T"] 
                 pp_combination["version"] = params_simulation["version"]
+
                 DH = DataHandler("Simulation", pp_combination, device=self.device)
 
                 #Sample from the Data handler
@@ -252,8 +275,7 @@ class Sampler():
         
         return batch,pandemic_parameters,starting_points, 
 
-    def __plot_subset____(self, L, K, B, T, starting_points, batch, max_num_plots=25, path="./plots/sampler.png"):
-
+    def __plot_subset____(self, L, K, B, T, starting_points, batch, max_num_plots=25, path="./plots/sampler.jpg"):
         #plot the slices
         x = np.arange(0,L)
         num = min(K*B,max_num_plots,25)
@@ -281,6 +303,13 @@ class Sampler():
             simulation_instance['B'] = B
             simulation_instance['L'] = L
             simulation_instance['T'] = T
+
+            simulation_instance["D_new"] = pp[0][i][5]
+            simulation_instance["r_new"] = pp[0][i][6]
+            simulation_instance["Smooth_transition"] = pp[0][i][8]
+            simulation_instance["T_change_D"] = pp[0][i][7]
+            
+            
             simulation_instance['version'] = version
             simulation_instance['mode'] = mode 
             simulation_instance['timeseries'] = list(batch[i])
@@ -304,9 +333,11 @@ if __name__ == "__main__":
 #####################################################################################
 #Example Sampler
 #####################################################################################
-
     lower_lims = {
         "D":1,
+        "D_new":1,
+        "r_new":0.0,
+        "T_change_D":0,
         "r":0.0,
         "d":7,
         "N_init":0,
@@ -315,6 +346,9 @@ if __name__ == "__main__":
 
     upper_lims = {
         "D":5,
+        "D_new":5,
+        "r_new":0.5,
+        "T_change_D":50,
         "r":0.5,
         "d":21,
         "N_init":20,
@@ -323,10 +357,10 @@ if __name__ == "__main__":
 
     N = 100 #10000
     L = 20 #10
-    K = 3 #1000
-    B = 2 #20
+    K = 10 #1000
+    B = 1 #20
     T = 50
-    version = "V3"
+    version = "V2"
     mode = "random"
     device = "cuda" if torch.cuda.is_available() else "cpu"
     path = f"./sampled_data_mode_{mode}_version_{version}_N-{N}_K-{K}.csv"
@@ -348,19 +382,73 @@ if __name__ == "__main__":
     print(batch_recov)
     print(pp_recov)
 
-'''
+
+def compare_hard_smooth_transition():
+    params_simulation = {
+        "D": 8,
+        "D_new":3,
+        "r_new":0.1,
+        "T_change_D":10,
+        "N": 1000,
+        "r": 0.1,
+        "d": 14,
+        "N_init": 5,
+        "T":30,
+        "epsilon":0.1,
+        "version":"V2",
+        "Smooth_transition":1
+    }
+
+    plt.figure(figsize = (30,15))
+
+    fs = 30
+
+    plt.xlabel("time [days]",fontsize = fs)
+    plt.ylabel("cumulative cases []",fontsize = fs)
+    plt.xticks(fontsize = fs)
+    plt.yticks(fontsize = fs)
+    plt.xlim([-1, params_simulation["T"]])
+    plt.ylim([0,1.2])
+
+    params_simulation["version"] = "V2"
+    params_simulation["Smooth_transition"] = 0
+    DH = DataHandler("Simulation",params_simulation,device = "cpu")
+    batch2,starting_points  = DH(B = None,L= None,return_plain=True)
+    plt.plot(batch2,label = f"V2, hard transition D = {params_simulation['D']} -> D = {params_simulation['D_new']}",linewidth = 6)
+
+    params_simulation["Smooth_transition"] = 1
+    DH = DataHandler("Simulation",params_simulation,device = "cpu")
+    batch2,starting_points  = DH(B = None,L= None,return_plain=True)
+    plt.plot(batch2,label = f"V2, soft transition D = {params_simulation['D']} -> D = {params_simulation['D_new']}",linewidth = 6)
+
+    params_simulation["Smooth_transition"] = 1
+    params_simulation["T_change_D"] = 10000
+    DH = DataHandler("Simulation",params_simulation,device = "cpu")
+    batch2,starting_points  = DH(B = None,L= None,return_plain=True)
+    plt.plot(batch2,label = f"V2, constant D = {params_simulation['D']}",linewidth = 6)
+
+    plt.legend(fontsize = fs)
+
+    plt.savefig(f"./compare_hard_smooth_transition.jpg")
+
+    plt.show()
+    
 #####################################################################################
 #Example
 #####################################################################################
 params_simulation = {
     "D": 8,
+    "D_new":3,
+    "r_new":0.1,
+    "T_change_D":10,
     "N": 1000,
     "r": 0.1,
     "d": 14,
     "N_init": 5,
     "T":30,
     "epsilon":0.1,
-    "version":"V2"
+    "version":"V2",
+    "Smooth_transition":1,
 } #version V2 is the one with random flipping
 
 params_real = {
@@ -382,22 +470,26 @@ params_SIR = {
 B = 2
 L = 9 
 
-params_simulation["version"] = "V1"
-DH = DataHandler("Simulation",params_simulation,device = "cpu")
-batch2,starting_points  = DH(B,L,return_plain=True)
-plt.plot(batch2,label = "V1")
-
+#params_simulation["version"] = "V1"
+#DH = DataHandler("Simulation",params_simulation,device = "cpu")
+#batch2,starting_points  = DH(B,L,return_plain=True)
+#plt.plot(batch2,label = "V1")
+"""
 params_simulation["version"] = "V2"
+params_simulation["Smooth_transition"] = 0
 DH = DataHandler("Simulation",params_simulation,device = "cpu")
 batch2,starting_points  = DH(B,L,return_plain=True)
-plt.plot(batch2,label = "V2")
+plt.plot(batch2,label = "V2, hard transition")
 
-params_simulation["version"] = "V3"
+params_simulation["Smooth_transition"] = 1
 DH = DataHandler("Simulation",params_simulation,device = "cpu")
 batch2,starting_points  = DH(B,L,return_plain=True)
-plt.plot(batch2,label = "V3")
+plt.plot(batch2,label = "V2, smooth transition")"""
 
-plt.legend()
-plt.show()
+#params_simulation["version"] = "V3"
+#DH = DataHandler("Simulation",params_simulation,device = "cpu")
+#batch2,starting_points  = DH(B,L,return_plain=True)
+#plt.plot(batch2,label = "V3")
 
-'''
+"""plt.legend()
+plt.show()"""
