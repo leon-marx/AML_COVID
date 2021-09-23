@@ -53,7 +53,7 @@ class DataHandler():
             if params["full"] == False:
                 
                 #Load the dictionary containig the information about the linear parts
-                with open("./classes/Countries/wave_regions.json","r") as file:
+                with open("./Countries/wave_regions.json","r") as file:
                     wave_dict = json.load(file)
 
                 if params["wave"] > wave_dict[params["file"].split('.')[0]]["N_waves"]:
@@ -62,7 +62,7 @@ class DataHandler():
                 lower = wave_dict[params["file"].split('.')[0]][f"{params['wave']}"][0]
                 upper = wave_dict[params["file"].split('.')[0]][f"{params['wave']}"][1]
 
-                self.cumulative = np.loadtxt("./classes/Countries/"+params["file"],skiprows=4)[lower:upper]
+                self.cumulative = np.loadtxt("./Countries/"+params["file"],skiprows=4)[lower:upper]
             
             #Use the full time series
             else:
@@ -71,15 +71,16 @@ class DataHandler():
             #Apply moving average to smoothen the time series
             if params["use_running_average"] == True:
                 self.cumulative = self.get_running_average(self.cumulative,params["dt_running_average"])
-
+            
             self.cumulative = torch.tensor(self.cumulative).to(device)
+            self.cumulative /= self.cumulative[-1].item()
 
         elif mode == "SIR":
             Timeseries = create_toydata(T = params["T"], I0 = params["I0"], R0 = params["R0"], N = params["N"], beta = params["beta"], gamma = params["gamma"]).T
             self.cumulative = torch.tensor((Timeseries[1]+Timeseries[2]) / params["N"]).to(device)
 
             #Normalize with the final value of the real data
-            self.cumulative /= self.cumulative[-1]
+            
 
 
         else:
@@ -329,7 +330,6 @@ class Sampler():
         return data, PP.repeat(L, 1, 1) 
 
 if __name__ == "__main__":
-
 #####################################################################################
 #Example Sampler
 #####################################################################################
