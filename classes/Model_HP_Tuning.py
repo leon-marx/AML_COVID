@@ -32,7 +32,7 @@ B = 10  # number of slices per simulation
 test_batch_size = 4
 foretime = 3
 backtime = 20
-n_epochs = 1#000
+n_epochs = 1000
 LOG_FOLDER = "C:/Users/gooog/Desktop/log_backup/Tuning_Logs"
 
 # Parameters to Tune
