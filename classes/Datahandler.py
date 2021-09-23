@@ -39,6 +39,7 @@ class DataHandler():
                     #Smooth the transition of the degree, by decreasing it step by step
                     if params["Smooth_transition"] == 1:
                         for j in range(1,params["D"]-params["D_new"]+1):
+                            print(i+j-1)
                             self.cumulative[i+j-1] = W(change_now=True,D_new = params["D"] - j,r_new = params["r_new"])
                     #Hard change of D -> D_new
                     else:

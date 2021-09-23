@@ -3,6 +3,7 @@ from torch import nn
 from Datahandler import DataHandler
 import matplotlib.pyplot as plt
 import numpy as np
+import Dataset
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -142,11 +143,11 @@ class RNN(nn.Module):
                     preds[i] = pred
         return preds
 
-    def train_model_old(self, training_data, training_PP, loss_fn, optimizer, epoch=None, verbose=False):
+    def train_model(self, training_X, training_PP, training_y, loss_fn, optimizer):
         """
         Implements one training step for a given time-series
-        training_data: should be a time series of shape (L, N, input_size) with:
-            L: sequence length, e.g. 50 days
+        training_X: should be a time series of shape (backtime, N, input_size) with:
+            backtime: as in init
             N: batch_size
             input_size: as above, generally 1
         training_PP: pandemic parameters, tensor of shape (L, N, 5) with:
@@ -158,90 +159,33 @@ class RNN(nn.Module):
                 r: daily transmission rate between two individuals which were in contact
                 d: duration of the infection
                 epsilon: rate of cross-contacts
-        loss_fn: use the loss functions provided by pytorch
-        optimizer: use the optimizers provided by pytorch
-        verbose: set True to print out the Training Loss
-        """
-        # Put on GPU if possible
-        training_data = training_data.to(device)
-        training_PP = training_PP.to(device)
-
-        # Split data 
-        X_data = training_data[:-1]
-        y_data = training_data[-1:]
-        X_PP = training_PP[:-1]
-
-        # Combine PP and timeseries with cumulative COVID-19 cases 
-        training_seq = torch.cat((X_data, X_PP), dim=2)
-        
-        # Initialize states h(0) and c(0) with PPs, predict value for next timestep and compute prediction error
-        self.train()
-        h_0 = self.get_h0(X_PP[0]).view(self.num_layers, X_PP.shape[1], self.hidden_size)
-        pred = self.forward(training_seq, h_0)
-        loss = loss_fn(pred, y_data)
-
-        # Backpropagation
-        optimizer.zero_grad()
-        loss.backward()
-        optimizer.step()
-        if verbose:
-            print(f"Epoch: {epoch} | Training Loss:", loss)
-    def train_model(self, training_data, training_PP, loss_fn, optimizer, epoch=None, verbose=False):
-        """
-        Implements one training step for a given time-series
-        training_data: should be a time series of shape (L, N, input_size) with:
-            L: sequence length, e.g. 50 days
+        training_y: should be a time series of shape (foretime, N, input_size) with:
+            foretime: as in init
             N: batch_size
             input_size: as above, generally 1
-        training_PP: pandemic parameters, tensor of shape (L, N, 5) with:
-            L: sequence length, e.g. 50 days
-            N: batch_size
-            5: the 5 different PP-values:
-                N_pop: population size
-                D: average degree of social network in population
-                r: daily transmission rate between two individuals which were in contact
-                d: duration of the infection
-                epsilon: rate of cross-contacts
         loss_fn: use the loss functions provided by pytorch
         optimizer: use the optimizers provided by pytorch
-        verbose: set True to print out the Training Loss
         """
-        L = training_data.shape[0]
-        N = training_data.shape[1]
-
         # Put on GPU if possible
-        training_data = training_data.to(device)
+        training_X = training_X.to(device)
         training_PP = training_PP.to(device)
+        training_y = training_y.to(device)
         
-        # Split data into many slices
-        X_data = torch.zeros(size=(self.backtime, N*(L-(self.backtime+self.foretime)), self.input_size-5))
-        X_PP_data = torch.zeros(size=(self.backtime, N*(L-(self.backtime+self.foretime)), 5))
-        y_data = torch.zeros(size=(self.foretime, N*(L-(self.backtime+self.foretime)), self.input_size-5))
-        for i in range(L-(self.backtime+self.foretime)):
-            X = training_data[i:i+self.backtime]
-            X_PP = training_PP[i:i+self.backtime]
-            y = training_data[i+self.backtime:i+self.backtime+self.foretime]
-            X_data[:, i*N:(i+1)*N, :] = X
-            X_PP_data[:, i*N:(i+1)*N, :] = X_PP
-            y_data[:, i*N:(i+1)*N, :] = y
-
         # Predict value for next timestep and compute prediction error
         self.train()
-        pred = self.forward_long(X_data, X_PP_data, self.foretime)
-        loss = loss_fn(pred, y_data).to(device)
+        pred = self.forward_long(training_X, training_PP, self.foretime).to(device)
+        loss = loss_fn(pred, training_y).to(device)
 
         # Backpropagation
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-        if verbose:
-            # print(f"Epoch: {epoch} | Training Loss:", loss)
-            return loss.item()    
+        return loss.item()   
 
-    def test_model(self, test_data, test_PP, loss_fn):
+    def test_model(self, test_X, test_PP, test_y, loss_fn):
         """
-        test_data: should be a time series of shape (L, N, input_size) with:
-            L: sequence length, e.g. 50 days
+        test_X: should be a time series of shape (backtime, N, input_size) with:
+            backtime: as in init
             N: batch_size
             input_size: as above, generally 1
         test_PP: pandemic parameters, tensor of shape (L, N, input_size) with:
@@ -253,39 +197,32 @@ class RNN(nn.Module):
                 r: daily transmission rate between two individuals which were in contact
                 d: duration of the infection
                 epsilon: rate of cross-contacts
+        test_y: should be a time series of shape (foretime, N, input_size) with:
+            foretime: as in init
+            N: batch_size
+            input_size: as above, generally 1
         loss_fn: use the loss functions provided by pytorch
         """
-        L = test_data.shape[0]
-        N = test_data.shape[1]
-
         # Put on GPU if possible
-        test_data = test_data.to(device)
+        test_X = test_X.to(device)
         test_PP = test_PP.to(device)
-
-        # Split data into many slices
-        X_data = torch.zeros(size=(self.backtime, N*(L-(self.backtime+self.foretime)), self.input_size-5))
-        X_PP_data = torch.zeros(size=(self.backtime, N*(L-(self.backtime+self.foretime)), 5))
-        y_data = torch.zeros(size=(self.foretime, N*(L-(self.backtime+self.foretime)), self.input_size-5))
-        for i in range(L-(self.backtime+self.foretime)):
-            X = test_data[i:i+self.backtime]
-            X_PP = test_PP[i:i+self.backtime]
-            y = test_data[i+self.backtime:i+self.backtime+self.foretime]
-            X_data[:, i*N:(i+1)*N, :] = X
-            X_PP_data[:, i*N:(i+1)*N, :] = X_PP
-            y_data[:, i*N:(i+1)*N, :] = y
+        test_y = test_y.to(device)
 
         self.eval()
         with torch.no_grad():
             # Compute prediction error
-            pred = self.predict_long(X_data, X_PP_data, self.foretime)
-            test_loss = loss_fn(pred, y_data).item()
-        print("Average Test Loss:", test_loss)
-
+            pred = self.predict_long(test_X, test_PP, self.foretime).to(device)
+            test_loss = loss_fn(pred, test_y).item()
         return test_loss
+    
+    def load_model(self, path="Trained_RNN_Model"):
+        return torch.load(path)
 
 
 # Example use
 if __name__ == "__main__":
+
+
 
     import Datahandler
 
