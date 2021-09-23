@@ -9,8 +9,7 @@ import torch
 import time 
 
 class GP_PP_finder():
-
-    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1,0,0,0.0,0,0]),upper_lims = np.array([0.5,15,0.25,10,20,15,0.5,20,1]),N_pop = 1000,version = "V2",device = "cpu",iterations = 120):
+    def __init__(self,N_initial_PP_samples,lower_lims = np.array([0.0,1,0.0,1,0,0,0.0,0,0]),upper_lims = np.array([0.5,15,0.25,10,20,15,0.5,20,1]),N_pop = 500,version = "V2",device = "cpu",iterations = 120):
         '''
         parameters:
             params_real             Paramters describing the real time series
@@ -29,11 +28,9 @@ class GP_PP_finder():
         self.device = device
         self.iterations = iterations
 
-        print(len(self.upper_lims),len(self.lower_lims))
-
         self.simulation_parameters = {
             "N":N_pop,
-            "d":14,
+            "d":6,
             "version":"V2"
         }
 
@@ -121,7 +118,7 @@ class GP_PP_finder():
             mse = self.cost(ts_real[S:] - ts_real[S],ts_simulation)
             costs[i] = mse
 
-            print("\t\t i = ",i,"\tMSE = ",mse)
+            print("\t\t i = ",i,"\tMSE = ",mse.item())
 
         costs = costs.reshape(-1,1)
         print("\n")
@@ -191,7 +188,7 @@ class GP_PP_finder():
             #Train the GP based on the initial data points
             GP.optimize(max_f_eval = 2000,messages = False)
 
-            print("\t\t i = ",j,"\tMSE = ",mse[0][0],"\t",len(pandemic_parammeters))
+            print("\t\t i = ",j,"\tMSE = ",mse[0][0].item())
 
         #Get the best parameters
         index = np.argmin(costs.reshape(-1))
@@ -238,7 +235,7 @@ if __name__ == "__main__":
 
     params_real = {
         "file":"Israel.txt",
-        "wave":3,
+        "wave":2,
         "full":False,
         "use_running_average":True,
         "dt_running_average":14
