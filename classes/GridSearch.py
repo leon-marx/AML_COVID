@@ -7,6 +7,7 @@ from operator import itemgetter
 import torch
 import random
 import pandas as pd
+import time
 
 class GridSearch_PP_finder():
     def __init__(self, pp_grid, eval_num = 100, N_pop = 10000, version = "V3",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120, mode="random"):
@@ -69,8 +70,8 @@ class GridSearch_PP_finder():
         '''
 
         #Get the full time series based on the observed cases
-        DH_real = DataHandler(mode,parameters,device = self.device)
-        ts,starting_points  = DH_real(B = None,L = None,return_plain=True)
+        DH = DataHandler(mode,parameters,device = self.device)
+        ts,starting_points  = DH(B = None,L = None,return_plain=True)
 
         #Let the time series beginn with zero infected individuals
         ts = ts - ts[0]
@@ -102,6 +103,9 @@ class GridSearch_PP_finder():
 
         for v in pp_combinations:
 
+            # Measure time 
+            t0 = time.perf_counter()
+
             # Parse pp
             pp = dict(zip(keys, v))
             self.simulation_parameters['d'] = pp['d']
@@ -111,12 +115,19 @@ class GridSearch_PP_finder():
             self.simulation_parameters['T'] = T
             self.simulation_parameters['epsilon'] = pp['epsilon']
 
+            # Without changing D 
+            self.simulation_parameters["D_new"] = pp["D"]  
+            self.simulation_parameters["r_new"] = pp["r"]  
+            self.simulation_parameters["T_change_D"] = T  
+
             #Get the simulated time series
             ts_simulation = self.get_time_series("Simulation", self.simulation_parameters)
 
+            t1 = time.perf_counter()
+
             #Get the mse between the simulation and the real time series
             mse = self.cost(ts_real,ts_simulation)
-            print(f"PP: {pp} | MSE = {mse}")
+            print(f"PP: {pp} | MSE = {mse} | Time = {t1-t0}")
 
             #Append 
             current_simulation_parameters = copy.deepcopy(self.simulation_parameters)
@@ -146,7 +157,7 @@ class GridSearch_PP_finder():
         plt.plot(ts_optimal.cpu(),label = "simulation")
         plt.plot(ts_real.cpu(),label = "observation")
         country = params_real["file"].split(".")[0]
-        plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}")
+        plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}, d = {round(self.simulation_parameters['d'],4)}, version = {round(self.simulation_parameters['version'],4)}, N = {round(self.simulation_parameters['N'],4)}")
         plt.legend()
         plt.savefig(f"./gridsearch/plots/GS_fit_{country}_{params_real['wave']}.jpg")
         plt.close()
@@ -163,12 +174,14 @@ if __name__ == "__main__":
     N_pop = 10000
     simulation_version = 'V3'
     eval_num = 200
-    mode = "random"
+    mode = "full_grid" #"random"
 
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
 
-    for country in waves.keys():
+    country_list = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
+
+    for country in ["UnitedStates"]: #waves.keys():
         N = waves[country]["N_waves"]
 
         print(f"\n{country}")
@@ -192,6 +205,14 @@ if __name__ == "__main__":
                 "N_init": [5,10,20,50,80,100]
             }
 
+            pp_grid_reduced = {
+                "epsilon": [0.1],
+                "D": [5,8,10], #[5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
+                "r": [0.01, 0.02, 0.05], #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
+                "d": list(np.linspace(5,10,6)),
+                "N_init": [5,10], # 20,50,80,100]
+            }
+
             pp_grid = {
                 "epsilon": list(np.linspace(0.05,0.2, 4)), #[0.1],
                 "D": list(np.linspace(5,10,6,dtype=int)), # [5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
@@ -200,7 +221,7 @@ if __name__ == "__main__":
                 "N_init": list(np.linspace(5,100,20,dtype=int)) #[5,10,20,50,80,100]
             }
 
-            gs = GridSearch_PP_finder(pp_grid=pp_grid, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, iterations = 60)
+            gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, iterations = 60, device="cpu")
             gs(params_real)
 
             #gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)

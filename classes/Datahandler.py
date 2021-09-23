@@ -25,28 +25,39 @@ class DataHandler():
 
         if mode == "Simulation":
             #initialize the small world network
-            W = World(N = params["N"], D = params["D"], r = params["r"], d = params["d"], N_init= params["N_init"],epsilon=params["epsilon"],version = params["version"])
+            W = World(N = params["N"], D = params["D"], r = params["r"], d = params["d"], N_init= params["N_init"],epsilon=params["epsilon"],version = params["version"], device=self.device)
             self.PP_data = torch.Tensor([params["N"], params["D"], params["r"], params["d"], params["epsilon"]])
 
             #Generate the full time series:
             self.cumulative = torch.zeros([params["T"]]).to(self.device)
+            smooth_check = False
             for i in range(params["T"]):
                 #Stp if the desired lengh is reached, to handle the extra loop in case of smooth transition
-                if self.cumulative[-1] != 0: break
+                if self.cumulative[-1] != 0:
+                    break
 
                 #Change the Pandemic parameters
                 if i == params["T_change_D"]:
                     #Smooth the transition of the degree, by decreasing it step by step
                     if params["Smooth_transition"] == 1:
-                        for j in range(1,params["D"]-params["D_new"]+1):
-                            print(i+j-1)
-                            self.cumulative[i+j-1] = W(change_now=True,D_new = params["D"] - j,r_new = params["r_new"])
+                        range_upper_lim = params["D"]-params["D_new"]
+                        if range_upper_lim == 0:
+                            self.cumulative[i] = W(change_now=True,D_new = params["D"],r_new = params["r_new"])
+                        for j in range(0,range_upper_lim):
+                            if self.cumulative[-1] != 0:
+                                break
+                            # print(i+j-1)
+                            self.cumulative[i+j] = W(change_now=True,D_new = params["D"] - (j+1),r_new = params["r_new"])
+                            smooth_check = True
                     #Hard change of D -> D_new
                     else:
                         self.cumulative[i] = W(change_now=True,D_new=params["D_new"],r_new = params["r_new"])
 
                 else:
-                    self.cumulative[i] = W()
+                    if smooth_check:
+                        self.cumulative[i+params["D"]-params["D_new"]-1] = W()
+                    else:
+                        self.cumulative[i] = W()
 
         elif mode == "Real":
 
@@ -72,15 +83,16 @@ class DataHandler():
             #Apply moving average to smoothen the time series
             if params["use_running_average"] == True:
                 self.cumulative = self.get_running_average(self.cumulative,params["dt_running_average"])
-
+            
             self.cumulative = torch.tensor(self.cumulative).to(device)
+            self.cumulative /= self.cumulative[-1].item()
 
         elif mode == "SIR":
             Timeseries = create_toydata(T = params["T"], I0 = params["I0"], R0 = params["R0"], N = params["N"], beta = params["beta"], gamma = params["gamma"]).T
             self.cumulative = torch.tensor((Timeseries[1]+Timeseries[2]) / params["N"]).to(device)
 
             #Normalize with the final value of the real data
-            self.cumulative /= self.cumulative[-1]
+            
 
 
         else:
@@ -214,15 +226,20 @@ class Sampler():
                     #integer variables
                     if k == "N_init" or k == "D" or k == "D_new" or k == "T_change_D": 
                         params_simulation[k] = int(np.random.uniform(self.lower_lims[k],self.upper_lims[k]))
-
                     #float variables
                     else:
                         params_simulation[k] = np.random.uniform(self.lower_lims[k],self.upper_lims[k])
+                params_simulation["D_new"] = min(params_simulation["D"], params_simulation["D_new"])
+                params_simulation["r_new"] = min(params_simulation["r"], params_simulation["r_new"])
 
                 #Get the simulation
                 DH = DataHandler("Simulation",params_simulation,device=self.device)
 
                 #Sample from the Data handler
+                b,_ = DH(B = None,L = None,return_plain=True)
+                b = b.to("cpu")
+                plt.plot(b)
+                # plt.show()
                 b,sp,PP= DH(B,L) #returns batch with shape [L,B,1]
                 
                 batch[i * B:(i+1) * B] = b.squeeze().T
@@ -330,18 +347,17 @@ class Sampler():
         return data, PP.repeat(L, 1, 1) 
 
 if __name__ == "__main__":
-
 #####################################################################################
 #Example Sampler
 #####################################################################################
     lower_lims = {
         "D":1,
         "D_new":1,
-        "r_new":0.0,
+        "r_new":0.001,
         "T_change_D":0,
-        "r":0.0,
+        "r":0.001,
         "d":7,
-        "N_init":0,
+        "N_init":1,
         "epsilon":0.0
     }
 
@@ -380,8 +396,8 @@ if __name__ == "__main__":
     S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./plots/samplertest.png")
     S.__save_to_file__(N=N, K=K, B=B, L=L, T=T, version=version, mode=mode, batch=batch,pp=pandemic_parameters,path=path)
     batch_recov, pp_recov = S.__load_from_file__(L=L, path=path)
-    print(batch_recov)
-    print(pp_recov)
+    # print(batch_recov)
+    # print(pp_recov)
 
 
 def compare_hard_smooth_transition():
