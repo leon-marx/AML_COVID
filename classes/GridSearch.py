@@ -1,3 +1,4 @@
+import copy
 from Datahandler import DataHandler
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,13 +11,15 @@ class GridSearch_PP_finder():
     def __init__(self, pp_grid, N_pop = 10000,version = "V3",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120):
         '''
         parameters:
-            pp_grid                 grid for pp search space 
+            pp_grid                 grid for pp search space with epsilon D,r,d,N_init
             params_real             Paramters describing the real time series
             N_pop                   Number of individuals in the small world model
             version                 Version of the Small world model                
             device                  Device
             iterations              Number of iterations to find the optimal pandemic parameters
         '''
+        assert all(key in pp_grid for key in ['epsilon','d','D','r','N_init'])
+
         self.pp_grid = pp_grid
         self.version = version
         self.device = device
@@ -24,8 +27,7 @@ class GridSearch_PP_finder():
 
         self.simulation_parameters = {
             "N":N_pop,
-            "d":14,
-            "version":"V2" #TODO V3
+            "version": version
         }
 
         # Print number of combinations 
@@ -95,6 +97,7 @@ class GridSearch_PP_finder():
 
             # Parse pp
             pp = dict(zip(keys, v))
+            self.simulation_parameters['d'] = pp['d']
             self.simulation_parameters['D'] = pp['D']
             self.simulation_parameters['r'] = pp['r']
             self.simulation_parameters['N_init'] = pp['N_init']
@@ -109,7 +112,8 @@ class GridSearch_PP_finder():
             print(f"PP: {pp} | MSE = {mse}")
 
             #Append 
-            results.append([self.simulation_parameters,float(mse.cpu().numpy())])
+            current_simulation_parameters = copy.deepcopy(self.simulation_parameters)
+            results.append([current_simulation_parameters, float(mse.cpu().numpy())])
 
             # Break if max_eval
             if i > max_evals:
@@ -150,7 +154,7 @@ if __name__ == "__main__":
 
     import json
 
-    N_pop = 100
+    N_pop = 1000
     simulation_version = 'V3'
 
     with open("./classes/Countries/wave_regions.json","r") as file:
@@ -176,7 +180,7 @@ if __name__ == "__main__":
                 "epsilon": [0.1],
                 "D": [5,6,7,8,9,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
                 "r": [0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
-                "d": [14], #[5], #list(np.linspace(5,10,6)),
+                "d": [14], #list(np.linspace(5,10,6)),
                 "N_init": [5,10,15,20,30,40,50,60,70,80,90,100]
             }
 

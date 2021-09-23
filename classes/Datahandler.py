@@ -6,7 +6,7 @@ from torch._C import device
 from Simulation import World
 import matplotlib.pyplot as plt
 from Toydata import create_toydata
-from scipy.optimize import curve_fit
+from ast import literal_eval
 import json
 import ast
 
@@ -170,7 +170,7 @@ class Sampler():
 
         returns:
             batch:                  Tensor of slices, shape of batch: [B*K, L ,1]
-            pandemic_parameters:    Pandemic parameters used to generate the corresponding entry in batch
+            pandemic_parameters:    Pandemic parameters used to generate the corresponding entry in batch (N, D, r, d, epsilon)
             starting_points:        Startingpositions of the different slices in teh time series
         '''
 
@@ -250,7 +250,7 @@ class Sampler():
                 starting_points[i * B : (i+1) * B] = torch.tensor(sp)
                 i+=1
         
-        return batch,pandemic_parameters,starting_points
+        return batch,pandemic_parameters,starting_points, 
 
     def __plot_subset____(self, L, K, B, T, starting_points, batch, max_num_plots=25, path="./plots/sampler.png"):
 
@@ -266,16 +266,38 @@ class Sampler():
             plt.legend()
         plt.savefig(path)
 
-    def __save_to_file__(self, data, PP, path="./sampled_data.csv"):
-        data = data.cpu().numpy()
-        PP = PP.cpu().numpy()
-        all = pd.DataFrame([(PP[i],data[i]) for i in range(len(data))], columns=['pp','timeseries'])
-        all.to_csv(path)
+    def __save_to_file__(self, N, K, B, L, T, version, mode, batch, pp, path="./sampled_data.csv"):
+        all_simulations = list()
+        batch = batch.cpu().numpy()
+        pp = pp.cpu().numpy()
+        for i in range (K*B):
+            simulation_instance = dict()
+            simulation_instance['N'] = str(pp[0][i][0]) #L,B*K,PP in order (N, D, r, d, epsilon)
+            simulation_instance['D'] = pp[0][i][1]
+            simulation_instance['r'] = pp[0][i][2]
+            simulation_instance['d'] = pp[0][i][3]
+            simulation_instance['epsilon'] = pp[0][i][4]
+            simulation_instance['K'] = K
+            simulation_instance['B'] = B
+            simulation_instance['L'] = L
+            simulation_instance['T'] = T
+            simulation_instance['version'] = version
+            simulation_instance['mode'] = mode 
+            simulation_instance['timeseries'] = list(batch[i])
+            all_simulations.append(simulation_instance)
 
-    def __load_from_file__(self, path="./sampled_data.csv"):
+        all_simulations = pd.DataFrame(all_simulations)
+        all_simulations.to_csv(path)
+
+        #with open(path, 'w') as f:
+        #    json.dump(all_simulations,f)
+        #all = pd.DataFrame([(PP[i],data[i]) for i in range(len(data))], columns=['pp','timeseries'])
+        #all.to_csv(path)
+
+    def __load_from_file__(self, L, path="./sampled_data.csv"):
         all = pd.read_csv(path)
-        data, PP = all['timeseries'], all['pp']
-        return data, PP 
+        data, PP = torch.tensor([literal_eval(ts) for ts in all['timeseries']]), torch.stack((torch.tensor(all['N']),torch.tensor(all['D']),torch.tensor(all['r']),torch.tensor(all['d']),torch.tensor(all['epsilon']))).T #(N, D, r, d, epsilon)
+        return data, PP.repeat(L, 1, 1) 
 
 if __name__ == "__main__":
 
@@ -305,7 +327,7 @@ if __name__ == "__main__":
     B = 2 #20
     T = 50
     version = "V3"
-    mode = "optimized"
+    mode = "random"
     device = "cuda" if torch.cuda.is_available() else "cpu"
     path = f"./sampled_data_mode_{mode}_version_{version}_N-{N}_K-{K}.csv"
 
@@ -321,10 +343,10 @@ if __name__ == "__main__":
     batch = batch.detach().view(L,K*B).T
     starting_points = starting_points.detach()
     S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./plots/samplertest.png")
-    S.__save_to_file__(batch,pandemic_parameters,path=path)
-    data, PP = S.__load_from_file__(path=path)
-    print(data)
-    print(PP)
+    S.__save_to_file__(N=N, K=K, B=B, L=L, T=T, version=version, mode=mode, batch=batch,pp=pandemic_parameters,path=path)
+    batch_recov, pp_recov = S.__load_from_file__(L=L, path=path)
+    print(batch_recov)
+    print(pp_recov)
 
 '''
 #####################################################################################
