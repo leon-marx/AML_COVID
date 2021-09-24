@@ -35,7 +35,7 @@ class Sampler():
         self.device = device
         self.path_to_optimized = path_to_optimized
     
-    def __call__(self,K,L,B,mode="random"):
+    def __call__(self,K,L,B,mse_threshold=0.1,mode="random"):
         '''
         parameters:
             K:      Number of Simulations from different pandemic parameter combinations
@@ -241,8 +241,8 @@ class Sampler():
         if not os.path.exists(path): 
             os.makedirs(path)
 
-        torch.save(data,f"./trainingdata/{version_name}/data_{version_name}.pt")
-        torch.save(pandemic_parameters,f"./trainingdata/{version_name}/pp_{version_name}.pt")
+        torch.save(data.cpu(),f"./trainingdata/{version_name}/data_{version_name}.pt")
+        torch.save(pandemic_parameters.cpu(),f"./trainingdata/{version_name}/pp_{version_name}.pt")
 
 
     def __load_from_sampled_file__(self, L, path="./sampled_data.csv"):
@@ -294,6 +294,7 @@ if __name__ == "__main__":
     K = 10 #1000
     B = 2 #20
     T = 60 # simulation?
+    mse_threshold = 0.1
     version = "V2"
     training_data_version = "v1"
     mode = "optimized"
@@ -311,7 +312,7 @@ if __name__ == "__main__":
 
     # Get simulated data with optimized pp from gridsearch 
     S = Sampler(lower_lims=lower_lims, upper_lims=upper_lims, N=N, T=T, version=version, device=device,path_to_optimized=path_to_optimized)
-    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode=mode) 
+    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode=mode,threshold=mse_threshold) 
     S.__plot_simulation_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path=f"./trainingdata/{training_data_version}/simulation_samples_{training_data_version}.png")
     S.__save_to_file_for_training__(data=batch, pandemic_parameters=pandemic_parameters, version_name=training_data_version)
     data, pp = S.__load_from_training_file__(version_name="v1")
