@@ -247,7 +247,7 @@ class LSTM(nn.Module):
         return test_loss
     
     def load_model(self, path="Trained_LSTM_Model"):
-        return self.state_dict = torch.load(path)
+        self.state_dict = torch.load(path)
 
     def apply_prediction(self, real_data, real_PP, n_days):
         """
