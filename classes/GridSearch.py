@@ -10,7 +10,7 @@ import pandas as pd
 import time
 
 class GridSearch_PP_finder():
-    def __init__(self, pp_grid, eval_num = 10, N_pop = 1000, version = "V2",device = "cuda" if torch.cuda.is_available() else "cpu", iterations = 120, mode="random"):
+    def __init__(self, pp_grid, eval_num = 10, N_pop = 1000, version = "V2",device = "cuda" if torch.cuda.is_available() else "cpu", mode="random"):
         '''
         parameters:
             pp_grid                 grid for pp search space with epsilon D,r,d,N_init
@@ -18,7 +18,6 @@ class GridSearch_PP_finder():
             N_pop                   Number of individuals in the small world model
             version                 Version of the Small world model                
             device                  Device
-            iterations              Number of iterations to find the optimal pandemic parameters
             mode                    if "random" -> sample pps in intervals specified in pp_grid
                                     if "full_grid" -> use cartesian product of pp specified in pp_grid
         '''
@@ -28,7 +27,6 @@ class GridSearch_PP_finder():
         self.pp_grid = pp_grid
         self.version = version
         self.device = device
-        self.iterations = iterations
         self.simulation_parameters = {
             "N":N_pop,
             "version": version
@@ -81,7 +79,7 @@ class GridSearch_PP_finder():
 
         return ts
 
-    def __call__(self,params_real, max_evals=200):
+    def __call__(self,params_real):
 
         #Get the real time series
         ts_real = self.get_time_series("Real", params_real)
@@ -139,11 +137,11 @@ class GridSearch_PP_finder():
             results.append([current_simulation_parameters, float(mse.cpu().numpy())])
 
             # Break if max_eval
-            if i > max_evals:
+            if i > self.max_evals:
                 break
     
         # Sort by mse-loss
-        results.sort(key=itemgetter(1), reverse=True)
+        results.sort(key=itemgetter(1), reverse=False)
 
         #Get the best parameters
         mse_list = [results[i][1] for i in range(len(results))] 
@@ -189,10 +187,10 @@ if __name__ == "__main__":
 
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
+    countries = waves.keys()
+    countries = ["UnitedStates", "Israel", "UnitedKingdom"] #["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
 
-    country_list = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
-
-    for country in ["UnitedStates"]: #waves.keys():
+    for country in countries: 
         N = waves[country]["N_waves"]
 
         print(f"\n{country}")
@@ -236,7 +234,7 @@ if __name__ == "__main__":
                 "N_init": list(np.linspace(5,100,20,dtype=int)) #[5,10,20,50,80,100]
             }
 
-            gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, iterations = 60, device="cpu")
+            gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, device="cpu")
             gs(params_real)
 
             #gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)
