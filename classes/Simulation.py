@@ -1,20 +1,14 @@
-from sys import version
 import matplotlib.pyplot as plt
 import numpy as np
-from numpy.core.numeric import indices
-from numpy.lib.function_base import select
 import torch
-import time
 
-#device = "cuda" if torch.cuda.is_available() else "cpu"
-#print("Device used: ",device)
+
 
 #######################################################################################################################
 #important:
 #
 #Currently, only version "V2" works correctly!
 #######################################################################################################################
-
 
 class World():
     '''
@@ -295,10 +289,9 @@ class World():
             if N % 2 != 0: raise ValueError("select even populationsize!")
 
             #sample the degrees from a poisson distribution with mean and variance D
+            self.D = D
             D = np.random.poisson(lam = self.D, size=self.N)
 
-            #Fixed average degree
-            self.D = D
             self.r = r
             self.e = epsilon
             self.d = d
@@ -388,6 +381,7 @@ class World():
 
                 #flip the connections
                 for u in range(len(no_longer_neighbors)):
+                    #print(len(no_longer_neighbors),len(new_neighbors),n_reconnect)
                     #set the old entry to zero
                     self.Network[i][no_longer_neighbors[u]] = 0
                     self.Network[no_longer_neighbors[u]][i] = 0
@@ -418,9 +412,7 @@ class World():
             flip_now:   Change in the Degree and the infection rate in the current call
             D_new:      New degree
             r_new:      New infection rate
-        
         '''
-        tic = time.perf_counter()
 
         #Change the infection rate and the degree of the model
         if change_now == True:
@@ -447,7 +439,24 @@ class World():
                         self.Network[contacts[indices],i] = 0
 
             elif self.version == "V3":
-                pass
+                for i in range(self.N):
+                    #sample the new degree from a poisson distribution
+                    D_i_new = torch.poisson(torch.tensor([self.D]).float())
+
+                    #is the current degree bigger then the new oneß
+                    if self.Network[i].sum() > D_i_new.item():
+                        #select the current contacts 
+                        mask = torch.where(self.Network[i] == 1,True,False)
+
+                        #get the indices of the current contacts
+                        contacts = torch.arange(self.N)[mask]
+
+                        #select the ccontacts that are no longer connected
+                        indices = torch.randperm(len(contacts))[int(D_i_new.item()):]
+
+                        #delete the selected connections
+                        self.Network[i,contacts[indices]] = 0
+                        self.Network[contacts[indices],i] = 0
 
             else:
                 raise(NotImplemented("Select version that allows changing the pandemic parameters!"))
@@ -488,14 +497,9 @@ class World():
         #return the total cumulative number of infected persons until the current time step
         ill_recoverd = (self.P > 1).sum()
 
-        toc = time.perf_counter()
-        # print(f"Simulate: {toc - tic:0.4f} seconds")
-
         return ill_recoverd / self.N
 
     def plotter(self,matrix,marker = None,name = None,cols_subplots = None,rows_subplots = None,subplot_index = None,title = None,fs = 35,ms = 100):
-        tic = time.perf_counter()
-
         r_x = 11
         r_y = 11
 
@@ -535,9 +539,6 @@ class World():
         if cols_subplots is None:
             plt.savefig(name)
             plt.close()
-
-        toc = time.perf_counter()
-        # print(f"Plotter: {toc - tic:0.4f} seconds")
 
 #######################################################################################################################
 #Evaluation
@@ -592,6 +593,7 @@ def compare_V2_V3(reps,sets):
     fs = 45
 
     for i in range(sets):
+        print(i)
         #Sample Hyperparameter sets
         D = int(np.random.uniform(1,20))
         T = 45
@@ -631,7 +633,7 @@ def compare_V2_V3(reps,sets):
 
         n += 1
 
-    plt.savefig("compare_V2_V3_empirically.jpg")
+    plt.savefig("./evaluation_report/compare_V2_V3_empirically.jpg")
 
 def visualize_reduced_degree_network(version,r_new = 0.2,D_new = 3,T_change = 5,T = 10):
     W = World(N = 14,D = 7,r = 0.1,epsilon=0.1,version = version)
@@ -646,7 +648,7 @@ def visualize_reduced_degree_network(version,r_new = 0.2,D_new = 3,T_change = 5,
     #visualize
     W.plotter(W.Network,cols_subplots=2,rows_subplots=1,subplot_index=2,title=f"D = {W.D}")
 
-    plt.savefig("change_degree_network.jpg")
+    plt.savefig(f"./evaluation_report/change_degree_network_{version}.jpg")
 
 def visualize_reduced_degree_pandemic_dynamics(version,T_change = 10):
 
@@ -664,7 +666,6 @@ def visualize_reduced_degree_pandemic_dynamics(version,T_change = 10):
 
         #reduce the degree
         if i == T_change:
-            print("now")
             c = W_reduced(True,3,0.1).item()
         else:
             c = W_reduced().item()
@@ -687,36 +688,56 @@ def visualize_reduced_degree_pandemic_dynamics(version,T_change = 10):
     plt.ylim([0,1.2])
     plt.legend(fontsize = fs)
 
-    plt.savefig(f"./pandemic_dynamics_{version}_reduced_degree.jpg")
-
-    plt.show()
+    plt.savefig(f"./evaluation_report/pandemic_dynamics_{version}_reduced_degree.jpg")
 
 if __name__ == "__main__":
 
-    # Parameters for the simulation 
-    N = 10000 # population size (number of individuals) #= 100  
-    D = 8 # degree, number of contact persons
-    r = 0.1 # 0.2 # rate of passing the infection
-    d = 6 #14 # duration of the infection
-    epsilon = 0.1
-    N_init = 10 #5 #number of persons infected at t_0; = 1 
-    T = 100 #200 #number of days
+    Eval = True
 
-    # Run the simulation 
-    W = World(N = N, D = D, r = r,d = d, epsilon=epsilon, N_init = N_init)
-    simulation = []
-    for i in range(T):
-        if i % 5 == 0: W.plotter(f"plots/Step_{i}.jpg")
-        simulation.append(float(W())*N)
-    # print(simulation)
+    if Eval:
+        print("Visualize initialization...")
+        visualize_init("V2")
+        visualize_init("V3")
 
-    # Plot the two series 
-    fig, ax = plt.subplots(1)
-    fig.suptitle('Simulation')
-    x = np.linspace(1, T, num=T)
-    ax.plot(x, simulation, label='Cumulative simulation')
-    plt.legend()
-    plt.savefig('plots/sim.jpg')
-    plt.close()
+        print("Visualize Pandemic dynamics...")
+        visualization_pandemic_dynamics("V2")
+        visualization_pandemic_dynamics("V3")
 
-    # compare_V2_V3(reps = 25,sets = 9)
+        print("Visualize reduced degree...")
+        visualize_reduced_degree_network("V2")
+        visualize_reduced_degree_network("V3")
+
+        visualize_reduced_degree_pandemic_dynamics("V2")
+        visualize_reduced_degree_pandemic_dynamics("V3")
+
+        print("Compare V2 and V3 of the Simulation...")
+        compare_V2_V3(10,9)
+
+    else:
+        # Parameters for the simulation 
+        N = 10000 # population size (number of individuals) #= 100  
+        D = 8 # degree, number of contact persons
+        r = 0.1 # 0.2 # rate of passing the infection
+        d = 6 #14 # duration of the infection
+        epsilon = 0.1
+        N_init = 10 #5 #number of persons infected at t_0; = 1 
+        T = 100 #200 #number of days
+
+        # Run the simulation 
+        W = World(N = N, D = D, r = r,d = d, epsilon=epsilon, N_init = N_init)
+        simulation = []
+        for i in range(T):
+            if i % 5 == 0: W.plotter(f"plots/Step_{i}.jpg")
+            simulation.append(float(W())*N)
+        # print(simulation)
+
+        # Plot the two series 
+        fig, ax = plt.subplots(1)
+        fig.suptitle('Simulation')
+        x = np.linspace(1, T, num=T)
+        ax.plot(x, simulation, label='Cumulative simulation')
+        plt.legend()
+        plt.savefig('plots/sim.jpg')
+        plt.close()
+
+        # compare_V2_V3(reps = 25,sets = 9)

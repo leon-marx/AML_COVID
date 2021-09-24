@@ -9,7 +9,12 @@ from Toydata import create_toydata
 from ast import literal_eval
 import json
 import ast
+<<<<<<< HEAD
+import random
+import os
+=======
 import tqdm
+>>>>>>> ae67c5256b15e048ed59c6a7c6acc3f9c6a8df7d
 
 
 class DataHandler():
@@ -175,7 +180,7 @@ class DataHandler():
         return running_averag
 
 class Sampler():
-    def __init__(self,lower_lims,upper_lims,N,T,version,device):
+    def __init__(self,lower_lims,upper_lims,N,T,version,device,path_to_optimized):
         '''
         parameters:
             lower_lims:     Dictionary containing the limit values of the different pandemic paramters
@@ -191,6 +196,7 @@ class Sampler():
         self.T = T
         self.version = version
         self.device = device
+        self.path_to_optimized = path_to_optimized
     
     def __call__(self,K,L,B,mode="random"):
         '''
@@ -214,10 +220,12 @@ class Sampler():
         params_simulation["version"] = self.version
         params_simulation["T"] = self.T
 
+        batch = torch.zeros([B*K,L]).to(self.device)
+        pandemic_parameters = torch.zeros([B*K,L,5]).to(self.device) #order: (N, D, r, d, epsilon); #N, D, r, d, epsilon, D_new, r_new, T_change_D, Smooth_transition
+        starting_points = torch.zeros([B*K]).to(self.device)
+
+        # Sample random parameters 
         if mode == "random":
-            batch = torch.zeros([B*K,L]).to(self.device)
-            pandemic_parameters = torch.zeros([B*K,9]).to(self.device) #order: (N, D, r, d, epsilon)
-            starting_points = torch.zeros([B*K]).to(self.device)
 
             for i in tqdm.tqdm(range(K)):
                 #smooth transition or not
@@ -238,77 +246,139 @@ class Sampler():
                 DH = DataHandler("Simulation",params_simulation,device=self.device)
 
                 #Sample from the Data handler
-                b,_ = DH(B = None,L = None,return_plain=True)
-                b = b.to("cpu")
-                plt.plot(b)
-                # plt.show()
-                b,sp,PP= DH(B,L) #returns batch with shape [L,B,1]
+                b,sp,PP= DH(B,L) #returns batch with shape [L,B,1] 
                 
-                batch[i * B:(i+1) * B] = b.squeeze().T
+                # changing D and r 
+                D = torch.zeros([L,1]).to(self.device)
+                r = torch.zeros([L,1]).to(self.device)
+                D[0:params_simulation["T_change_D"]] = params_simulation["D"]
+                D[params_simulation["T_change_D"]:] = params_simulation["D_new"]
+                r[0:params_simulation["T_change_D"]] = params_simulation["r"]
+                r[params_simulation["T_change_D"]:] = params_simulation["r_new"]
 
-                pandemic_parameters[i * B:(i+1) * B] = torch.tensor([params_simulation["N"], params_simulation["D"],params_simulation["r"],params_simulation["d"],params_simulation["epsilon"],params_simulation["D_new"],params_simulation["r_new"],params_simulation["T_change_D"],params_simulation["Smooth_transition"]])[None,:]
+                # parse rest of parameters 
+                torch_N = torch.tensor(params_simulation["N"]).repeat(L,1).to(self.device)
+                torch_d = torch.tensor(params_simulation["d"]).repeat(L,1).to(self.device)
+                torch_epsilon = torch.tensor(params_simulation["epsilon"]).repeat(L,1).to(self.device)
+
+                # append to timeseries
+                batch[i * B:(i+1) * B] = b.squeeze().T
+                pandemic_parameters[i * B:(i+1) * B] = torch.cat((torch_N,D,r,torch_d,torch_epsilon),dim=1).unsqueeze(dim=0)
                 starting_points[i * B : (i+1) * B] = torch.tensor(sp)
-                # print(sp)
 
             #Shuffle the batch
             indices = np.random.permutation(B * K)
-
             batch = batch[indices].to(self.device)
-            pandemic_parameters = pandemic_parameters[indices].repeat(L, 1, 1).to(self.device)
+            pandemic_parameters = pandemic_parameters[indices].to(self.device) #.repeat(L, 1, 1).to(self.device)
             starting_points = starting_points[indices].to(self.device)
 
             #reshape the batch 
             batch = batch.T.view([L,B * K,1]).to(self.device)
         
+        # Use pp's from simulation fitted on real data
         elif mode == "optimized":
 
-            #TODO include N (population size) and country 
+            #TODO D_new, r_new; include N (population size) and country
 
             #Read optimized pp from file
-            with open("./config.json", "r") as f: 
-                config = json.load(f)
-            df_pp = pd.read_csv(config["path_optimized_pp"])
-            pp = df_pp['0']
+            #with open("./config.json", "r") as f: 
+            #    config = json.load(f)
+            #df_pp = pd.read_csv(config["path_optimized_pp"])
+            #df_pp = pd.read_csv(path)
+            #pp = df_pp['0']
+            #assert K <= len(pp) # number of different pp combinations
+            
+            #Get pp from different files 
+            files = os.listdir(self.path_to_optimized)
+            parameter_list = list()
+            cost_list = list()
+            unified_sim_param_list = list()
+            for file in files:
+                if file.endswith('.csv'):
+                    parameters, cost = self.__load_from_optimized_file__(f"{self.path_to_optimized}/{file}")
+                    parameter_list.append(parameters)
+                    cost_list.append(cost)
 
-            assert K <= len(pp) # number of different pp combinations
-            batch = torch.zeros([B*K,L]).to(self.device)
-            pandemic_parameters = torch.zeros([B*K,5]).to(self.device) #order: (N, D, r, d, epsilon)
-            starting_points = torch.zeros([B*K]).to(self.device)
+            assert len(parameter_list) == len(cost_list)
 
+            # unify lists pp_all = torch.cat((pp_all, p), dim=0)
+            unified_sim_param_list = list()
+            cost_threshold = 0.05
+            for i in range(len(parameter_list)):
+                costs = cost_list[i]
+                parameters = parameter_list[i]
+                for c in range(len(costs)):
+                    if costs[c] < cost_threshold:
+                        unified_sim_param_list.append(parameters[c])
+
+            #Shuffle torches
+            random.shuffle(unified_sim_param_list)
+            print(f"Found {len(unified_sim_param_list)} pp combinations with mse < {cost_threshold}")
+            
             #Get the simulation for all combinations
             i = 0
+            assert K <= len(unified_sim_param_list)
             for i in range(K):
                 # Instantiate Data handler 
-                pp_combination = ast.literal_eval(pp[i]) #cast i string(dict) -> dict
-                pp_combination["N"] = params_simulation["N"]
-                pp_combination["T"] = params_simulation["T"] 
-                pp_combination["version"] = params_simulation["version"]
+                pp_sim = ast.literal_eval(unified_sim_param_list[i]) #cast i string(dict) -> dict
 
-                DH = DataHandler("Simulation", pp_combination, device=self.device)
+                # Use N,T and version given to Sampler 
+                pp_sim["N"] = params_simulation["N"]
+                pp_sim["T"] = params_simulation["T"] 
+                pp_sim["version"] = params_simulation["version"]
 
-                #Sample from the Data handler
+                # Run simulation with pps
+                DH = DataHandler("Simulation", pp_sim, device=self.device)
                 b,sp,PP= DH(B,L) #returns batch with shape [L,B,1]
+
+                # Changing D and r 
+                D = torch.zeros([L,1]).to(self.device)
+                r = torch.zeros([L,1]).to(self.device)
+                D[0:pp_sim["T_change_D"]] = pp_sim["D"]
+                D[pp_sim["T_change_D"]:] = pp_sim["D_new"]
+                r[0:pp_sim["T_change_D"]] = pp_sim["r"]
+                r[pp_sim["T_change_D"]:] = pp_sim["r_new"]
+
+                # parse rest of parameters 
+                torch_N = torch.tensor(pp_sim["N"]).repeat(L,1).to(self.device)
+                torch_d = torch.tensor(pp_sim["d"]).repeat(L,1).to(self.device)
+                torch_epsilon = torch.tensor(pp_sim["epsilon"]).repeat(L,1).to(self.device)
+
+                # append to timeseries
                 batch[i * B:(i+1) * B] = b.squeeze().T
-                pandemic_parameters[i * B:(i+1) * B] = torch.tensor([pp_combination["N"], pp_combination["D"],pp_combination["r"],pp_combination["d"],pp_combination["epsilon"]])[None,:]
+                pandemic_parameters[i * B:(i+1) * B] = torch.cat((torch_N,D,r,torch_d,torch_epsilon),dim=1).unsqueeze(dim=0)
                 starting_points[i * B : (i+1) * B] = torch.tensor(sp)
+
                 i+=1
+
+            #Shuffle the batch
+            indices = np.random.permutation(B * K)
+            batch = batch[indices].to(self.device)
+            pandemic_parameters = pandemic_parameters[indices].to(self.device) #.repeat(L, 1, 1).to(self.device)
+            starting_points = starting_points[indices].to(self.device)
+
+            #reshape the batch 
+            batch = batch.T.view([L,B * K,1]).to(self.device)
+            pandemic_parameters = pandemic_parameters.view([L,B * K,5]).to(self.device)
         
         return batch,pandemic_parameters,starting_points, 
 
     def __plot_subset____(self, L, K, B, T, starting_points, batch, max_num_plots=25, path="./plots/sampler.jpg"):
-        #plot the slices
+        
         x = np.arange(0,L)
         num = min(K*B,max_num_plots,25)
+        batch = batch.reshape(K*B,L,1)
+        
+        #plot the slices
         plt.figure(figsize=(12, 12))
         plt.suptitle('Samples from simulation')
         for i in range(num):
             plt.subplot(5, 5, i+1)
             plt.plot(x, batch[i].cpu().numpy(), color = "b")
-            plt.xlim([0,T])
             plt.legend()
         plt.savefig(path)
 
-    def __save_to_file__(self, N, K, B, L, T, version, mode, batch, pp, path="./sampled_data.csv"):
+    def __save_pp_cost_to_file__(self, N, K, B, L, T, version, mode, batch, pp, path="./sampled_data.csv"):
         all_simulations = list()
         batch = batch.cpu().numpy()
         pp = pp.cpu().numpy()
@@ -324,11 +394,10 @@ class Sampler():
             simulation_instance['L'] = L
             simulation_instance['T'] = T
 
-            simulation_instance["D_new"] = pp[0][i][5]
-            simulation_instance["r_new"] = pp[0][i][6]
-            simulation_instance["Smooth_transition"] = pp[0][i][8]
-            simulation_instance["T_change_D"] = pp[0][i][7]
-            
+            #simulation_instance["D_new"] = pp[0][i][5]
+            #simulation_instance["r_new"] = pp[0][i][6]
+            #simulation_instance["Smooth_transition"] = pp[0][i][8]
+            #simulation_instance["T_change_D"] = pp[0][i][7]
             
             simulation_instance['version'] = version
             simulation_instance['mode'] = mode 
@@ -343,10 +412,36 @@ class Sampler():
         #all = pd.DataFrame([(PP[i],data[i]) for i in range(len(data))], columns=['pp','timeseries'])
         #all.to_csv(path)
 
-    def __load_from_file__(self, L, path="./sampled_data.csv"):
+    def __save_to_file_for_training__(self, data, pandemic_parameters, version_name):
+        
+        path = f"{os.getcwd()}/trainingdata/{version_name}/"
+
+        if not os.path.exists(path): 
+            os.makedirs(path)
+
+        torch.save(data,f"./trainingdata/{version_name}/data_{version_name}.pt")
+        torch.save(pandemic_parameters,f"./trainingdata/{version_name}/pp_{version_name}.pt")
+
+
+    def __load_from_sampled_file__(self, L, path="./sampled_data.csv"):
         all = pd.read_csv(path)
         data, PP = torch.tensor([literal_eval(ts) for ts in all['timeseries']]), torch.stack((torch.tensor(all['N']),torch.tensor(all['D']),torch.tensor(all['r']),torch.tensor(all['d']),torch.tensor(all['epsilon']))).T #(N, D, r, d, epsilon)
         return data, PP.repeat(L, 1, 1) 
+
+    def __load_from_optimized_file__(self, path="./sampled_data.csv"):
+        content = pd.read_csv(path)
+        parameters = content['0']
+        cost = content['1']
+        return parameters, cost
+    
+    def __load_from_training_file__(self, version_name):
+        data = torch.load(f"./trainingdata/{version_name}/data_{version_name}.pt")
+        pp = torch.load(f"./trainingdata/{version_name}/pp_{version_name}.pt")
+        return data, pp
+
+        #data, PP = torch.tensor([literal_eval(all[0]]), torch.stack((torch.tensor(all['N']),torch.tensor(all['D']),torch.tensor(all['r']),torch.tensor(all['d']),torch.tensor(all['epsilon']))).T #(N, D, r, d, epsilon)
+        #return data, PP.repeat(L, 1, 1) 
+
 
 if __name__ == "__main__":
 #####################################################################################
@@ -375,33 +470,33 @@ if __name__ == "__main__":
     }
 
     N = 100 #10000
-    L = 20 #10
+    L = 50 #10 datahandler?
     K = 10 #1000
-    B = 1 #20
-    T = 50
+    B = 2 #20
+    T = 60 # simulation?
     version = "V2"
-    mode = "random"
+    mode = "optimized"
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    path = f"./sampled_data_mode_{mode}_version_{version}_N-{N}_K-{K}.csv"
+    path_to_optimized = "gridsearch_v3_correct" #f"./sampled_data_mode_{mode}_version_{version}_N-{N}_K-{K}.csv"
+    path_to_random = "./gridsearch/GS_random.csv"
 
-    #Random Sampler 
-    #S = Sampler(lower_lims,upper_lims,1000,T,"V3","cpu")
-    #batch,pandemic_parameters,starting_points = S(K,L,B)
-    #batch = batch.detach().view(L,K*B).numpy().T
-    #starting_points = starting_points.detach().numpy()
+    # Get simulated data with optimized pp from gridsearch 
+    S = Sampler(lower_lims=lower_lims, upper_lims=upper_lims, N=N, T=T, version=version, device=device,path_to_optimized=path_to_optimized)
+    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode=mode) 
+    S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./gridsearch/samplertest.png")
+    S.__save_pp_cost_to_file__(N=N, K=K, B=B, L=L, T=T, version=version, mode=mode, batch=batch,pp=pandemic_parameters,path=path_to_random)
 
-    #Optimized Sampler 
-    S = Sampler(lower_lims=lower_lims, upper_lims=upper_lims, N=N, T=T, version=version, device=device)
-    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode=mode)
-    batch = batch.detach().view(L,K*B).T
-    starting_points = starting_points.detach()
-    S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./plots/samplertest.png")
-    S.__save_to_file__(N=N, K=K, B=B, L=L, T=T, version=version, mode=mode, batch=batch,pp=pandemic_parameters,path=path)
-    batch_recov, pp_recov = S.__load_from_file__(L=L, path=path)
-    # print(batch_recov)
-    # print(pp_recov)
-
-
+    '''
+    # Get simulated data with optimized pp from gridsearch 
+    S = Sampler(lower_lims=lower_lims, upper_lims=upper_lims, N=N, T=T, version=version, device=device,path_to_optimized=path_to_optimized)
+    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode=mode) 
+    S.__plot_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path="./gridsearch/samplertest.png")
+    S.__save_to_file_for_training__(data=batch, pandemic_parameters=pandemic_parameters, version_name="v1")
+    data, pp = S.__load_from_training_file__(version_name="v1")
+    print(data.shape)
+    print(pp.shape)
+    '''
+    
 def compare_hard_smooth_transition():
     params_simulation = {
         "D": 8,
@@ -455,6 +550,7 @@ def compare_hard_smooth_transition():
 #####################################################################################
 #Example
 #####################################################################################
+
 params_simulation = {
     "D": 8,
     "D_new":3,
