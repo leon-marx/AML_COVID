@@ -10,14 +10,15 @@ import LSTM_Model
 
 # Fixed Parameters
 input_size = 1
-DATA_PATH = "data_path.pt"
-PP_PATH = "pp_path.pt"
+training_data_version = "v1"
+DATA_PATH = f"./trainingdata/{training_data_version}/data_{training_data_version}.pt" #"data_path.pt"
+PP_PATH = f"./trainingdata/{training_data_version}/pp_{training_data_version}.pt"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 foretime = 3
 backtime = 20
 n_epochs = 1000
 LOG_FOLDER = "Tuning_Logs"
-batch_length = 2500
+batch_length = 20000
 train_ratio = 0.7
 batch_size = 2048
 random_seed = 17
