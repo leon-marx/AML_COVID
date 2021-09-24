@@ -216,7 +216,7 @@ class RNN(nn.Module):
         return test_loss
     
     def load_model(self, path="Trained_RNN_Model"):
-        return torch.load(path)
+        self.state_dict = torch.load(path)
 
 
 # Example use
