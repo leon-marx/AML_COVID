@@ -593,6 +593,7 @@ def compare_V2_V3(reps,sets):
     fs = 45
 
     for i in range(sets):
+        print(i)
         #Sample Hyperparameter sets
         D = int(np.random.uniform(1,20))
         T = 45
