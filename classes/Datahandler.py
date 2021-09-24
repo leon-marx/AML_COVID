@@ -275,4 +275,3 @@ def compare_real_data_simulation(reps = 2,n = 1):
     plt.savefig(f"./compare_simulation_real_data_{params_real['file'].split('.')[0]}_{params_real['wave']}_{reps}_reps_{n}.jpg")
     plt.show()
 
-compare_real_data_simulation(100,1)
