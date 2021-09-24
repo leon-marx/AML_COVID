@@ -9,12 +9,9 @@ from Toydata import create_toydata
 from ast import literal_eval
 import json
 import ast
-<<<<<<< HEAD
 import random
 import os
-=======
 import tqdm
->>>>>>> ae67c5256b15e048ed59c6a7c6acc3f9c6a8df7d
 
 
 class DataHandler():
