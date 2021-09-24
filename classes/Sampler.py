@@ -130,17 +130,16 @@ class Sampler():
 
             # unify lists pp_all = torch.cat((pp_all, p), dim=0)
             unified_sim_param_list = list()
-            cost_threshold = 0.05
             for i in range(len(parameter_list)):
                 costs = cost_list[i]
                 parameters = parameter_list[i]
                 for c in range(len(costs)):
-                    if costs[c] < cost_threshold:
+                    if costs[c] < mse_threshold:
                         unified_sim_param_list.append(parameters[c])
 
             #Shuffle torches
             random.shuffle(unified_sim_param_list)
-            print(f"Found {len(unified_sim_param_list)} pp combinations with mse < {cost_threshold}")
+            print(f"Found {len(unified_sim_param_list)} pp combinations with mse < {mse_threshold}")
             
             #Get the simulation for all combinations
             i = 0
@@ -291,12 +290,12 @@ if __name__ == "__main__":
 
     N = 2500 #10000
     L = 50 #10 datahandler?
-    K = 10 #1000
+    K = 1000 #1000
     B = 2 #20
     T = 60 # simulation?
-    mse_threshold = 0.1
+    mse_threshold = 0.15
     version = "V2"
-    training_data_version = "v1"
+    training_data_version = "v2"
     mode = "optimized"
     device = "cuda" if torch.cuda.is_available() else "cpu"
     path_to_optimized = "gridsearch_v3_correct" #f"./sampled_data_mode_{mode}_version_{version}_N-{N}_K-{K}.csv"
@@ -312,10 +311,10 @@ if __name__ == "__main__":
 
     # Get simulated data with optimized pp from gridsearch 
     S = Sampler(lower_lims=lower_lims, upper_lims=upper_lims, N=N, T=T, version=version, device=device,path_to_optimized=path_to_optimized)
-    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode=mode,threshold=mse_threshold) 
+    batch,pandemic_parameters,starting_points = S(K=K,L=L,B=B,mode=mode,mse_threshold=mse_threshold) 
     S.__plot_simulation_subset____(L=L, K=K, B=B, T=T, starting_points=starting_points, batch=batch, path=f"./trainingdata/{training_data_version}/simulation_samples_{training_data_version}.png")
     S.__save_to_file_for_training__(data=batch, pandemic_parameters=pandemic_parameters, version_name=training_data_version)
-    data, pp = S.__load_from_training_file__(version_name="v1")
+    data, pp = S.__load_from_training_file__(version_name=training_data_version)
     print(data.shape)
     print(pp.shape)
 
