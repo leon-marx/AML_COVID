@@ -1,6 +1,5 @@
 import torch
 from torch import nn
-from Datahandler import DataHandler
 import matplotlib.pyplot as plt
 import numpy as np
 import Dataset
@@ -115,7 +114,7 @@ class LSTM(nn.Module):
             pred = self.forward(PP_sequence, inits=(h_0, c_0))
         return pred
 
-    def predict_long(self, sequence, PP_input, n_days):
+    def predict_long(self, sequence, PP_input, n_days, long_PP=False):
         """
         sequence: should be a time series of shape (L, N, input_size) with:
             L: sequence length, e.g. 50 days
@@ -131,24 +130,48 @@ class LSTM(nn.Module):
                 d: duration of the infection
                 epsilon: rate of cross-contacts
         n_days: number of days to predict in the future
+        long_PP: the PP input is longer than the sequence, marking an expected change in policy
         """
         sequence = sequence.to(device)
         PP_input = PP_input.to(device)
         preds = torch.zeros(size=(n_days, sequence.shape[1], self.input_size-5))
-        for i in range(n_days):
-            PP_sequence = torch.cat((sequence, PP_input), dim=2) #19,1,6 (number of days, ..., 6 dimensions [5PP,1value]); 10,1,6
-            self.eval()
-            with torch.no_grad():
-                if i == 0:
-                    h_0 = self.get_h0(PP_input[0]).view(self.num_layers, PP_input.shape[1], self.hidden_size) #2,1,256
-                    c_0 = self.get_c0(PP_input[0]).view(self.num_layers, PP_input.shape[1], self.hidden_size) #2,1,256
-                    pred, (h_final, c_final) = self.forward(PP_sequence, inits=(h_0, c_0), full=True)
-                    new_PP_seq = torch.cat((pred, PP_input[-1].view(1, PP_input.shape[1], 5)), dim=2)
-                    preds[i] = pred
-                else:
-                    pred, (h_final, c_final) = self.forward(new_PP_seq, inits=(h_final, c_final), full=True)
-                    new_PP_seq = torch.cat((pred, PP_input[-1].view(1, PP_input.shape[1], 5)), dim=2)
-                    preds[i] = pred
+        ###
+        # THIS IS FOR TESTING, MIGHT BE BUGGY, BUT IF NOT ITS NICER
+        long_PP = True
+        ###
+        if long_PP:
+            for i in range(n_days):
+                L_seq = sequence.shape[0]
+                L_p = PP_input.shape[0] - L_seq
+                PP_sequence = torch.cat((sequence, PP_input[:L_seq]), dim=2) #19,1,6 (number of days, ..., 6 dimensions [5PP,1value]); 10,1,6
+                self.eval()
+                with torch.no_grad():
+                    PP_ind = min(L_seq+L_p-1, L_seq+i)
+                    if i == 0:
+                        h_0 = self.get_h0(PP_input[0]).view(self.num_layers, PP_input.shape[1], self.hidden_size) #2,1,256
+                        c_0 = self.get_c0(PP_input[0]).view(self.num_layers, PP_input.shape[1], self.hidden_size) #2,1,256
+                        pred, (h_final, c_final) = self.forward(PP_sequence, inits=(h_0, c_0), full=True)
+                        new_PP_seq = torch.cat((pred, PP_input[PP_ind].view(1, PP_input.shape[1], 5)), dim=2)
+                        preds[i] = pred
+                    else:
+                        pred, (h_final, c_final) = self.forward(new_PP_seq, inits=(h_final, c_final), full=True)
+                        new_PP_seq = torch.cat((pred, PP_input[PP_ind].view(1, PP_input.shape[1], 5)), dim=2)
+                        preds[i] = pred
+        else:
+            for i in range(n_days):
+                PP_sequence = torch.cat((sequence, PP_input), dim=2) #19,1,6 (number of days, ..., 6 dimensions [5PP,1value]); 10,1,6
+                self.eval()
+                with torch.no_grad():
+                    if i == 0:
+                        h_0 = self.get_h0(PP_input[0]).view(self.num_layers, PP_input.shape[1], self.hidden_size) #2,1,256
+                        c_0 = self.get_c0(PP_input[0]).view(self.num_layers, PP_input.shape[1], self.hidden_size) #2,1,256
+                        pred, (h_final, c_final) = self.forward(PP_sequence, inits=(h_0, c_0), full=True)
+                        new_PP_seq = torch.cat((pred, PP_input[-1].view(1, PP_input.shape[1], 5)), dim=2)
+                        preds[i] = pred
+                    else:
+                        pred, (h_final, c_final) = self.forward(new_PP_seq, inits=(h_final, c_final), full=True)
+                        new_PP_seq = torch.cat((pred, PP_input[-1].view(1, PP_input.shape[1], 5)), dim=2)
+                        preds[i] = pred
         return preds
 
     def train_model(self, training_X, training_PP, training_y, loss_fn, optimizer):
@@ -224,97 +247,128 @@ class LSTM(nn.Module):
         return test_loss
     
     def load_model(self, path="Trained_LSTM_Model"):
-        return torch.load(path)
+        return self.state_dict = torch.load(path)
 
-    
+    def apply_prediction(self, real_data, real_PP, n_days):
+        """
+        real_Data: should be a time series of shape (L, N, input_size) with:
+            L: sequence length, e.g. 50 days
+            N: batch_size, generally 1
+            input_size: as above, generally 1
+        real_PP: pandemic parameters, tensor of shape (L+L_p, N, 5) with:
+            L: sequence length, e.g. 50 days
+            L_p: length one wants to predict. This is optional, if it is 0 the Net will assume constant PPs at the end
+            N: batch_size, generally 1
+            5: the 5 different PP-values:
+                N_pop: population size
+                D: average degree of social network in population
+                r: daily transmission rate between two individuals which were in contact
+                d: duration of the infection
+                epsilon: rate of cross-contacts
+        n_days: how many days to predict
+        """
+        ###
+        # IF THIS DOES NOT WORK; YOU HAVE TO CUT TO THE LAST self.backtime DAYS ONLY!!!!!!!!!!!!!!!
+        # IF PREDICT LONG WORKS WITH long_PP=True ALWAYS; WE CAN SKIP THIS IF-ELSE!!!!!
+        ###
+        if real_data.shape[0] < real_PP.shape[0]:
+            prediction = self.predict_long(real_data, real_PP, n_days, long_PP=True)
+        else:
+            prediction = self.predict_long(real_data, real_PP, n_days)
+        return prediction
+
+    def apply_PP_fit(self, real_data, PP_min, PP_max, loss_fn):
+        """
+        real_Data: should be a time series of shape (L, 1, input_size) with:
+            L: sequence length, e.g. 50 days
+            1: only one time series at a time can be fitted
+            input_size: as above, generally 1
+        PP_min: minimum values of possible pandemic parameters, tensor of shape (5) with:
+            5: the 5 different PP-values:
+                N_pop: population size
+                D: average degree of social network in population
+                r: daily transmission rate between two individuals which were in contact
+                d: duration of the infection
+                epsilon: rate of cross-contacts
+        PP_max: maximum values of possible pandemic parameters, tensor of shape (5) with:
+            5: the 5 different PP-values:
+                N_pop: population size
+                D: average degree of social network in population
+                r: daily transmission rate between two individuals which were in contact
+                d: duration of the infection
+                epsilon: rate of cross-contacts
+        """
+        ####
+        # FOR NOW; THIS ONLY ALLOWS A SINGLE PP TUPLE TO HOLD TRUE THE ENTIRE TIME
+        # THIS MEANS 
+        ####
+        n_days = real_data.shape[0] - self.backtime
+        N_range = np.arange(PP_min[0], PP_max[0], step=max(1, (PP_max[0]-PP_min[0])//10))
+        D_range = np.arange(PP_min[1], PP_max[1], step=max(1, (PP_max[1]-PP_min[1])//10))
+        r_range = np.arange(PP_min[2], PP_max[2], step=max(0.1, (PP_max[2]-PP_min[2])/10.0))
+        d_range = np.arange(PP_min[3], PP_max[3], step=max(1, (PP_max[3]-PP_min[3])//10))
+        epsilon_range = np.arange(PP_min[4], PP_max[4], step=max(0.1, (PP_max[4]-PP_min[4])/10.0))
+        print(N_range)
+        print(D_range)
+        print(r_range)
+        print(d_range)
+        print(epsilon_range)
+        current_loss = np.inf
+        current_best = None
+        for N in N_range:
+            for D in D_range:
+                for r in r_range:
+                    for d in d_range:
+                        for epsilon in epsilon_range:
+                            PP_inp = torch.Tensor([N, D, r, d, epsilon]).repeat(real_data.shape[0], 1, 1)
+                            ###
+                            # Check if repetition works
+                            # check if long_PP=True is necessary (AS ABOVE)
+                            ###
+                            prediction = self.predict_long(real_data[self.backtime:], PP_inp, n_days)
+                            loss = loss_fn(prediction, real_data[:self.backtime])
+                            if loss < current_loss:
+                                current_loss = loss
+                                current_best = torch.Tensor([N, D, r, d, epsilon])
+        return current_best, current_loss
+
+
+
 # Example use
 if __name__ == "__main__":
-    
-
-
-    import Datahandler
-
-    # Parameters
     input_size = 1
     hidden_size = 256
-    output_size = 1
     num_layers = 2
     dropout = 0.5
-    lower_lims = {
-        "D": 1,
-        "r": 0.0,
-        "d": 3,
-        "N_init": 1,
-        "epsilon": 0.0
-    }
-    upper_lims = {
-        "D": 10,
-        "r": 0.5,
-        "d": 21,
-        "N_init": 5,
-        "epsilon": 0.7
-    }
-    N = 1000  # population size
-    T = 50  # length of the simulation   AS BIG AS POSSIBLE WITHOUT FLAT
-    version = "V3"
     device = "cuda" if torch.cuda.is_available() else "cpu"
-    K = 50  # number of simulations sampled from the PP ranges   AS BIG AS POSSIBLE
-    L = T - 5  # length of the slices
-    B = 5  # number of slices per simulation
-    n_epochs = 10000
-    learning_rate = 0.0001
-    test_batch_size = 4
     backtime = 20  # number of days the network gets to see before prediction
     foretime = 3  # number of days to predict for long predictions
-
-    # Models
-    print("Initializing Models")
+    batch_length = 2500
+    train_ratio = 0.7
+    batch_size = 1
+    DATA_PATH = "data_path.pt"
+    PP_PATH = "PP_path.pt"
     mylstm = LSTM(input_size=input_size,
                             hidden_size=hidden_size,
                             num_layers=num_layers,
                             dropout=dropout,
                             foretime=foretime,
                             backtime=backtime)
-
-    mysampler = Datahandler.Sampler(lower_lims=lower_lims,
-                                    upper_lims=upper_lims,
-                                    N=N,
-                                    T=T,
-                                    version=version,
-                                    device=device)
-
-    mylstm.load_state_dict(mylstm.load_model())
-    
-
-
-    # Data Generation
-    print("Generating Data")
-    
-    batch, pandemic_parameters, starting_points = mysampler(K, L, B)
-    training_data = batch[:,:-test_batch_size,...]
-    test_data = batch[:,-test_batch_size:,...]
-    training_PP = pandemic_parameters[:,:-test_batch_size,...]
-    test_PP = pandemic_parameters[:,-test_batch_size:,...]
-    
+    train_inds, test_inds = torch.utils.data.random_split(
+        torch.arange(batch_length), 
+        [int(batch_length*train_ratio), batch_length - int(batch_length*train_ratio)], 
+        generator=torch.Generator().manual_seed(17))
+    def my_collate(batch):
+        x = torch.zeros(size=(backtime, len(batch), 1))
+        pp = torch.zeros(size=(backtime, len(batch), 5))
+        y = torch.zeros(size=(foretime, len(batch), 1))
+        for i, item in enumerate(batch):
+            x[:, i, :] = item[0]
+            pp[:, i, :] = item[1]
+            y[:, i, :] = item[2]
+        return x, pp, y
+    training_data = Dataset.Dataset(DATA_PATH, PP_PATH, train_inds, backtime=backtime, foretime=foretime)
+    test_data = Dataset.Dataset(DATA_PATH, PP_PATH, test_inds, backtime=backtime, foretime=foretime)
+    training_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
+    test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
     loss_fn = torch.nn.MSELoss()
-    mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
-
-'''
-
-    # LSTM Training
-    print("Training LSTM")
-    mylstm.to(device)
-    
-    optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
-
-    for epoch in range(n_epochs):
-        print(f"Starting epoch {epoch}")
-        mylstm.train_model(training_data=training_data, training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer)
-        if epoch % 100 == 0:
-            mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
-
-    # Save Model
-    torch.save(mylstm.state_dict(), "Trained_LSTM_Model")
-    '''
-
-

@@ -18,6 +18,7 @@ num_layers = 2
 nonlinearity = "tanh"
 dropout = 0.5
 device = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Running on {device}")
 n_epochs = 100
 
 learning_rate = 0.0001
@@ -110,13 +111,9 @@ def training_loop(model, name):
 # LSTM Training
 print("Training LSTM")
 mylstm.to(device)
-# training_loop(mylstm, "LSTM")
+training_loop(mylstm, "LSTM")
 
 # RNN Training
 print("Training RNN")
 myrnn.to(device)
-training_loop(myrnn, "RNN")
-training_loop(myrnn, "RNN")
-training_loop(myrnn, "RNN")
-training_loop(myrnn, "RNN")
 training_loop(myrnn, "RNN")
