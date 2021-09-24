@@ -18,15 +18,17 @@ num_layers = 2
 nonlinearity = "tanh"
 dropout = 0.5
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 100
+n_epochs = 10000
+
 learning_rate = 0.0001
 backtime = 20  # number of days the network gets to see before prediction
 foretime = 3  # number of days to predict for long predictions
-batch_length = 250
+batch_length = 20 #2500
 train_ratio = 0.7
-batch_size = 16
-DATA_PATH = "data_path.pt"
-PP_PATH = "PP_path.pt"
+batch_size = 1024
+training_data_version = "v1"
+DATA_PATH = f"./trainingdata/{training_data_version}/data_{training_data_version}.pt" #"data_path.pt"
+PP_PATH = f"./trainingdata/{training_data_version}/pp_{training_data_version}.pt"
 
 # Models
 print("Initializing Models")
@@ -66,10 +68,10 @@ training_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batc
 test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
 
 loss_fn = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
 
 def training_loop(model, name):
     # Training
+    optimizer = torch.optim.Adam(params=model.parameters(), lr=learning_rate)
     t_loop = tqdm.trange(n_epochs, leave=True)
     for epoch in t_loop:
         for X, X_PP, y in training_dataloader:
@@ -109,9 +111,13 @@ def training_loop(model, name):
 # LSTM Training
 print("Training LSTM")
 mylstm.to(device)
-training_loop(mylstm, "LSTM")
+# training_loop(mylstm, "LSTM")
 
 # RNN Training
 print("Training RNN")
 myrnn.to(device)
+training_loop(myrnn, "RNN")
+training_loop(myrnn, "RNN")
+training_loop(myrnn, "RNN")
+training_loop(myrnn, "RNN")
 training_loop(myrnn, "RNN")
