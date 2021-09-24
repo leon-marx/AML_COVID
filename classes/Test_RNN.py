@@ -18,16 +18,17 @@ num_layers = 2
 nonlinearity = "tanh"
 dropout = 0.5
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 100
+n_epochs = 10000
 
 learning_rate = 0.0001
 backtime = 20  # number of days the network gets to see before prediction
 foretime = 3  # number of days to predict for long predictions
-batch_length = 2500
+batch_length = 20 #2500
 train_ratio = 0.7
 batch_size = 1024
-DATA_PATH = "data_path.pt"
-PP_PATH = "PP_path.pt"
+training_data_version = "v1"
+DATA_PATH = f"./trainingdata/{training_data_version}/data_{training_data_version}.pt" #"data_path.pt"
+PP_PATH = f"./trainingdata/{training_data_version}/pp_{training_data_version}.pt"
 
 # Models
 print("Initializing Models")
