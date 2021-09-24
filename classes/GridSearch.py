@@ -157,7 +157,7 @@ class GridSearch_PP_finder():
         plt.plot(ts_optimal.cpu(),label = "simulation")
         plt.plot(ts_real.cpu(),label = "observation")
         country = params_real["file"].split(".")[0]
-        plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}, d = {round(self.simulation_parameters['d'],4)}, version = {round(self.simulation_parameters['version'],4)}, N = {round(self.simulation_parameters['N'],4)}")
+        plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}, d = {round(self.simulation_parameters['d'],4)}, version = {self.simulation_parameters['version']}, N = {round(self.simulation_parameters['N'],4)}")
         plt.legend()
         plt.savefig(f"./gridsearch/plots/GS_fit_{country}_{params_real['wave']}.jpg")
         plt.close()
@@ -171,17 +171,18 @@ if __name__ == "__main__":
 
     import json
 
-    N_pop = 10000
+    N_pop = 100
     simulation_version = 'V3'
-    eval_num = 200
-    mode = "full_grid" #"random"
+    eval_num = 15
+    mode = "random" #"random" / "full_grid"
 
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
+    countries = waves.keys()
+    countries = ["Germany"] #, "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
 
-    country_list = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
+    for country in countries:
 
-    for country in ["UnitedStates"]: #waves.keys():
         N = waves[country]["N_waves"]
 
         print(f"\n{country}")
