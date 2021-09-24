@@ -1,39 +1,26 @@
 # Package Imports
+import numpy as np
 import torch
+import tqdm
 
 # Own Imports
-import Datahandler
+import Dataset
 import RNN_Model
 import LSTM_Model
 
 # Fixed Parameters
 input_size = 1
-lower_lims = {
-    "D": 1,
-    "r": 0.0,
-    "d": 3,
-    "N_init": 1,
-    "epsilon": 0.0
-}
-upper_lims = {
-    "D": 10,
-    "r": 0.5,
-    "d": 21,
-    "N_init": 5,
-    "epsilon": 0.7
-}
-N = 1000  # population size
-T = 50  # length of the simulation
-version = "V3"
+DATA_PATH = "data_path.pt"
+PP_PATH = "pp_path.pt"
 device = "cuda" if torch.cuda.is_available() else "cpu"
-K = 10  # number of simulations sampled from the PP ranges
-L = 40  # length of the slices
-B = 10  # number of slices per simulation
-test_batch_size = 4
 foretime = 3
 backtime = 20
 n_epochs = 1000
 LOG_FOLDER = "Tuning_Logs"
+batch_length = 2500
+train_ratio = 0.7
+batch_size = 2048
+random_seed = 17
 
 # Parameters to Tune
 hidden_size_list = [128, 256, 512]
@@ -42,21 +29,26 @@ dropout_list = [0.0, 0.5]
 nonlinearity_list = ["tanh", "relu"]
 learning_rate_list = [0.00001, 0.0001, 0.001, 0.01]
 
-# Sampler Initialization
-mysampler = Datahandler.Sampler(lower_lims=lower_lims,
-                                upper_lims=upper_lims,
-                                N=N,
-                                T=T,
-                                version=version,
-                                device=device)
+# Dataloader
+train_inds, test_inds = torch.utils.data.random_split(
+    torch.arange(batch_length), 
+    [int(batch_length*train_ratio), batch_length - int(batch_length*train_ratio)], 
+    generator=torch.Generator().manual_seed(random_seed))
 
-# Data Generation
-print("Generating Data")
-batch, pandemic_parameters, starting_points = mysampler(K, L, B)
-training_data = batch[:,:-test_batch_size,...]
-test_data = batch[:,-test_batch_size:,...]
-training_PP = pandemic_parameters[:,:-test_batch_size,...]
-test_PP = pandemic_parameters[:,-test_batch_size:,...]
+def my_collate(batch):
+    x = torch.zeros(size=(backtime, len(batch), 1))
+    pp = torch.zeros(size=(backtime, len(batch), 5))
+    y = torch.zeros(size=(foretime, len(batch), 1))
+    for i, item in enumerate(batch):
+        x[:, i, :] = item[0]
+        pp[:, i, :] = item[1]
+        y[:, i, :] = item[2]
+    return x, pp, y
+
+training_data = Dataset.Dataset(DATA_PATH, PP_PATH, train_inds, backtime=backtime, foretime=foretime)
+test_data = Dataset.Dataset(DATA_PATH, PP_PATH, test_inds, backtime=backtime, foretime=foretime)
+training_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
+test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
 
 def tune_rnn(hidden_size, num_layers, nonlinearity, learning_rate):
     # Model
@@ -78,12 +70,17 @@ def tune_rnn(hidden_size, num_layers, nonlinearity, learning_rate):
     optimizer = torch.optim.Adam(params=myrnn.parameters(), lr=learning_rate)
     train_losses = []
     test_losses = []
-    for epoch in range(n_epochs):
-        train_loss = myrnn.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer, verbose=True)
-        train_losses.append(train_loss)
+    t_loop = tqdm.trange(n_epochs, leave=True)
+    for epoch in t_loop:
+        for X, X_PP, y in training_dataloader:
+            train_loss = myrnn.train_model(training_X=X, training_PP=X_PP, training_y=y, loss_fn=loss_fn, optimizer=optimizer)
+            train_losses.append(train_loss)
+            t_loop.set_description(f"Epoch: {epoch}, Training Loss: {train_loss}")
         if epoch % 100 == 0:
-            test_loss = myrnn.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
-            test_losses.append(test_loss)
+            for X_t, X_PP_t, y_t in test_dataloader:
+                test_loss = myrnn.test_model(test_X=X_t, test_PP=X_PP_t, test_y=y_t, loss_fn=loss_fn)
+                test_losses.append(test_loss)
+            print(f"Average Test Loss: {np.mean(test_losses)}")
     with open(f"{LOG_FOLDER}/RNN-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity_{nonlinearity}-learning_rate_{learning_rate}_train.txt", "w") as file:
         for loss in train_losses:
             file.write(str(loss) + "\n")
@@ -115,12 +112,17 @@ def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
     optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
     train_losses = []
     test_losses = []
-    for epoch in range(n_epochs):
-        train_loss = mylstm.train_model(training_data=training_data,training_PP=training_PP, loss_fn=loss_fn, optimizer=optimizer, verbose=True)
-        train_losses.append(train_loss)
+    t_loop = tqdm.trange(n_epochs, leave=True)
+    for epoch in t_loop:
+        for X, X_PP, y in training_dataloader:
+            train_loss = mylstm.train_model(training_X=X, training_PP=X_PP, training_y=y, loss_fn=loss_fn, optimizer=optimizer)
+            t_loop.set_description(f"Epoch: {epoch}, Training Loss: {train_loss}")
         if epoch % 100 == 0:
-            test_loss = mylstm.test_model(test_data=test_data, test_PP=test_PP, loss_fn=loss_fn)
-            test_losses.append(test_loss)
+            test_losses = []
+            for X_t, X_PP_t, y_t in test_dataloader:
+                test_loss = mylstm.test_model(test_X=X_t, test_PP=X_PP_t, test_y=y_t, loss_fn=loss_fn)
+                test_losses.append(test_loss)
+            print(f"Average Test Loss: {np.mean(test_losses)}")
     with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout_{dropout}-learning_rate_{learning_rate}_train.txt", "w") as file:
         for loss in train_losses:
             file.write(str(loss) + "\n")
@@ -140,9 +142,9 @@ for hidden_size in hidden_size_list:
                 try:
                     tune_rnn(hidden_size, num_layers, nonlinearity, learning_rate)
                 except RuntimeError:
-                    continue
+                    print("A step was skipped due to a RuntimeError!")
             for dropout in dropout_list:
                 try:
                     tune_lstm(hidden_size, num_layers, dropout, learning_rate)
                 except RuntimeError:
-                    continue
+                    print("A step was skipped due to a RuntimeError!")

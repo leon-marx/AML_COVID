@@ -9,8 +9,12 @@ from Toydata import create_toydata
 from ast import literal_eval
 import json
 import ast
+<<<<<<< HEAD
 import random
 import os
+=======
+import tqdm
+>>>>>>> ae67c5256b15e048ed59c6a7c6acc3f9c6a8df7d
 
 
 class DataHandler():
@@ -32,22 +36,34 @@ class DataHandler():
 
             #Generate the full time series:
             self.cumulative = torch.zeros([params["T"]]).to(self.device)
+            smooth_check = False
             for i in range(params["T"]):
                 #Stp if the desired lengh is reached, to handle the extra loop in case of smooth transition
-                if self.cumulative[-1] != 0: break
+                if self.cumulative[-1] != 0:
+                    break
 
                 #Change the Pandemic parameters
                 if i == params["T_change_D"]:
                     #Smooth the transition of the degree, by decreasing it step by step
                     if params["Smooth_transition"] == 1:
-                        for j in range(1,params["D"]-params["D_new"]+1):
-                            self.cumulative[i+j-1] = W(change_now=True,D_new = params["D"] - j,r_new = params["r_new"])
+                        range_upper_lim = params["D"]-params["D_new"]
+                        if range_upper_lim == 0:
+                            self.cumulative[i] = W(change_now=True,D_new = params["D"],r_new = params["r_new"])
+                        for j in range(0,range_upper_lim):
+                            if self.cumulative[-1] != 0:
+                                break
+                            # print(i+j-1)
+                            self.cumulative[i+j] = W(change_now=True,D_new = params["D"] - (j+1),r_new = params["r_new"])
+                            smooth_check = True
                     #Hard change of D -> D_new
                     else:
                         self.cumulative[i] = W(change_now=True,D_new=params["D_new"],r_new = params["r_new"])
 
                 else:
-                    self.cumulative[i] = W()
+                    if smooth_check:
+                        self.cumulative[i+params["D"]-params["D_new"]-1] = W()
+                    else:
+                        self.cumulative[i] = W()
 
         elif mode == "Real":
 
@@ -73,8 +89,9 @@ class DataHandler():
             #Apply moving average to smoothen the time series
             if params["use_running_average"] == True:
                 self.cumulative = self.get_running_average(self.cumulative,params["dt_running_average"])
-            
-            self.cumulative = torch.tensor(self.cumulative).to(device)
+
+            self.cumulative = torch.tensor(self.cumulative).to(device) 
+            self.cumulative -= self.cumulative[0].item()
             self.cumulative /= self.cumulative[-1].item()
 
         elif mode == "SIR":
@@ -210,7 +227,7 @@ class Sampler():
         # Sample random parameters 
         if mode == "random":
 
-            for i in range(K):
+            for i in tqdm.tqdm(range(K)):
                 #smooth transition or not
                 params_simulation["Smooth_transition"] = torch.randint(low=0,high=2,size = [1]).item()
 
@@ -219,10 +236,11 @@ class Sampler():
                     #integer variables
                     if k == "N_init" or k == "D" or k == "D_new" or k == "T_change_D": 
                         params_simulation[k] = int(np.random.uniform(self.lower_lims[k],self.upper_lims[k]))
-
                     #float variables
                     else:
                         params_simulation[k] = np.random.uniform(self.lower_lims[k],self.upper_lims[k])
+                params_simulation["D_new"] = min(params_simulation["D"], params_simulation["D_new"])
+                params_simulation["r_new"] = min(params_simulation["r"], params_simulation["r_new"])
 
                 #Get the simulation
                 DH = DataHandler("Simulation",params_simulation,device=self.device)
@@ -432,11 +450,11 @@ if __name__ == "__main__":
     lower_lims = {
         "D":1,
         "D_new":1,
-        "r_new":0.0,
+        "r_new":0.001,
         "T_change_D":0,
-        "r":0.0,
+        "r":0.001,
         "d":7,
-        "N_init":0,
+        "N_init":1,
         "epsilon":0.0
     }
 
