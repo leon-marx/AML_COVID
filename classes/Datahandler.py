@@ -1,4 +1,5 @@
 from sys import version
+from numpy.core.fromnumeric import mean
 import torch
 import numpy as np
 import pandas as pd
@@ -174,4 +175,103 @@ class DataHandler():
 
             running_averag[i] = mean
 
-        return running_averag
+
+def compare_hard_smooth_transition():
+    params_simulation = {
+        "D": 8,
+        "D_new":3,
+        "r_new":0.1,
+        "T_change_D":10,
+        "N": 1000,
+        "r": 0.1,
+        "d": 14,
+        "N_init": 5,
+        "T":30,
+        "epsilon":0.1,
+        "version":"V2",
+        "Smooth_transition":1
+    }
+
+    plt.figure(figsize = (30,15))
+
+    fs = 30
+
+    plt.xlabel("time [days]",fontsize = fs)
+    plt.ylabel("cumulative cases []",fontsize = fs)
+    plt.xticks(fontsize = fs)
+    plt.yticks(fontsize = fs)
+    plt.xlim([-1, params_simulation["T"]])
+    plt.ylim([0,1.2])
+
+    params_simulation["version"] = "V2"
+    params_simulation["Smooth_transition"] = 0
+    DH = DataHandler("Simulation",params_simulation,device = "cpu")
+    batch2,starting_points  = DH(B = None,L= None,return_plain=True)
+    plt.plot(batch2,label = f"V2, hard transition D = {params_simulation['D']} -> D = {params_simulation['D_new']}",linewidth = 6)
+
+    params_simulation["Smooth_transition"] = 1
+    DH = DataHandler("Simulation",params_simulation,device = "cpu")
+    batch2,starting_points  = DH(B = None,L= None,return_plain=True)
+    plt.plot(batch2,label = f"V2, soft transition D = {params_simulation['D']} -> D = {params_simulation['D_new']}",linewidth = 6)
+
+    params_simulation["Smooth_transition"] = 1
+    params_simulation["T_change_D"] = 10000
+    DH = DataHandler("Simulation",params_simulation,device = "cpu")
+    batch2,starting_points  = DH(B = None,L= None,return_plain=True)
+    plt.plot(batch2,label = f"V2, constant D = {params_simulation['D']}",linewidth = 6)
+
+    plt.legend(fontsize = fs)
+
+    #plt.savefig(f"./compare_hard_smooth_transition.jpg")
+
+    plt.show()
+
+def compare_real_data_simulation(reps = 2,n = 1):
+
+    #params_simulation = {'N': 1500, 'version': 'V2', 'd': 5.333, 'D': 6, 'r': 0.05, 'r_new': 0.05, 'D_new': 6, 'T_change_D': 91, 'Smooth_transition': 1, 'N_init': 9, 'T': 90, 'epsilon': 0.04}
+    #params_simulation = {'N': 1500, 'version': 'V2', 'd': 5.333, 'D': 5, 'r': 0.045, 'r_new': 0.05, 'D_new': 6, 'T_change_D': 91, 'Smooth_transition': 1, 'N_init': 11, 'T': 90, 'epsilon': 0.05}
+    params_simulation = {'N': 1500, 'version': 'V2', 'd': 5.333, 'D': 5, 'r': 0.045, 'r_new': 0.05, 'D_new': 6, 'T_change_D': 91, 'Smooth_transition': 1, 'N_init': 11, 'T': 90, 'epsilon': 0.05}
+    params_real = {"file":"Israel.txt","wave":3,"full":False,"use_running_average":True,"dt_running_average":14}
+
+    fs = 30
+
+    params_simulation["Smooth_transition"] = 1
+    DH = DataHandler("Real",params_real,device = "cpu")
+    real_data,starting_points  = DH(B = None,L = None,return_plain=True)
+
+    params_simulation["T"] = len(real_data)
+
+    set = np.zeros([reps,params_simulation["T"]])
+
+
+    for i in tqdm.tqdm(range(reps)):
+        DH = DataHandler("Simulation",params_simulation,device = "cpu")
+        batch2,starting_points  = DH(B = None,L = None,return_plain=True)
+        set[i] = batch2
+
+    #Get the mean 
+    means = np.mean(set,axis=0)
+    std = np.std(set,axis=0)
+
+
+    plt.figure(figsize = (30,15))
+
+    means -= means[0]
+
+    plt.fill_between(x = np.arange(len(means)),y1=means - std,y2 = means + std,color = "orange")
+    plt.plot(real_data,color = "b",label = "Real",linewidth = 4)
+    plt.plot(means,ls = ":",color = "r",label = "mean simulation",linewidth = 4)
+
+    plt.plot(means + std,color = "r")
+    plt.plot(means - std,color = "r",label = r"1 $\sigma$-interval")
+
+    
+    plt.xlabel("time [days]",fontsize = fs)
+    plt.ylabel("cumulative cases [days]",fontsize = fs)
+    plt.xticks(fontsize = fs)
+    plt.yticks(fontsize = fs)
+    plt.legend(fontsize = fs)
+
+    plt.savefig(f"./compare_simulation_real_data_{params_real['file'].split('.')[0]}_{params_real['wave']}_{reps}_reps_{n}.jpg")
+    plt.show()
+
