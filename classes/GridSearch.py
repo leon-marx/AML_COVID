@@ -137,7 +137,7 @@ class GridSearch_PP_finder():
             results.append([current_simulation_parameters, float(mse.cpu().numpy())])
 
             # Break if max_eval
-            if i > self.max_evals:
+            if i > self.eval_num:
                 break
     
         # Sort by mse-loss
@@ -188,7 +188,7 @@ if __name__ == "__main__":
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
     countries = waves.keys()
-    countries = ["UnitedStates", "Israel", "UnitedKingdom"] #["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
+    countries = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
 
     for country in countries: 
         N = waves[country]["N_waves"]
