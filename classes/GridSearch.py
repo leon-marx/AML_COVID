@@ -191,13 +191,7 @@ if __name__ == "__main__":
     countries = waves.keys()
     countries = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
 
-<<<<<<< HEAD
-    country_list = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
-
-    for country in ["Israel"]: #waves.keys():
-=======
     for country in countries: 
->>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
         N = waves[country]["N_waves"]
 
         print(f"\n{country}")
@@ -225,12 +219,7 @@ if __name__ == "__main__":
                 "Smooth_transition":[1]
             }
 
-
-<<<<<<< HEAD
-            gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version="V2", iterations = 60, device="cpu")
-=======
             gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, device="cpu")
->>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
             gs(params_real)
 
             #gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)
