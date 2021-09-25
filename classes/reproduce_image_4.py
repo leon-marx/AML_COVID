@@ -24,17 +24,17 @@ initial = torch.tensor(initial)
 pp_grid_reduced = {
     "epsilon": [0.05,0.04,0.03],
     "D": [8,9,10],
-    "D_new": [8],
+    "D_new": [2,3,4],
     "r": [0.05,0.04,0.03],
     "r_new": [8],
     "d": [4,5,6],
-    "N_init": [1,2,3],
+    "N_init": [1,2],
     "T_change_D":[1e4],
     "Smooth_transition":[1]
 }
 
 class GridSearch_PP_finder():
-    def __init__(self, pp_grid, eval_num = 1, N_pop = 5000, version = "V2",device = "cuda" if torch.cuda.is_available() else "cpu", mode="full"):
+    def __init__(self, pp_grid, eval_num = 10, N_pop = 1000, version = "V2",device = "cuda" if torch.cuda.is_available() else "cpu", mode="full"):
         '''
         parameters:
             pp_grid                 grid for pp search space with epsilon D,r,d,N_init
@@ -55,6 +55,7 @@ class GridSearch_PP_finder():
             "N":N_pop,
             "version": version
         }
+        self.reps = 10
 
     def cost(self,ts_1,ts_2):
         '''
@@ -141,7 +142,7 @@ class GridSearch_PP_finder():
             self.simulation_parameters['epsilon'] = pp['epsilon']
 
             # Without changing D 
-            reps = 15
+            reps = self.reps
             self.simulation_parameters["T_change_D"] = T  
             set = np.zeros([reps,self.simulation_parameters['T']])
             
@@ -205,18 +206,69 @@ class GridSearch_PP_finder():
 
 
 print("Get the optimal parameters for the initial sequence...")
-#finder = GridSearch_PP_finder(pp_grid_reduced)
-#optimal_pp = finder()
-#print("\tOptimal pp: ",optimal_pp)
+finder = GridSearch_PP_finder(pp_grid_reduced)
+optimal_pp = finder()
+print("\tOptimal pp: ",optimal_pp)
 
 print("Compare the full time series...")
 
 fs = 30
-reps = 500
-#optimal_pp["T"] = len(data_usa)
+reps = 50
 
-optimal_pp =  {'N': 5000, 'version': 'V2', 'd': 4, 'D': 8, 'r': 0.05, 'r_new': 8, 'D_new': 8, 'T_change_D': 1000, 'Smooth_transition': 1, 'N_init': 1, 'T': 17, 'epsilon': 0.05}
+#optimal_pp =  {'N': 5000, 'version': 'V2', 'd': 4, 'D': 8, 'r': 0.05, 'r_new': 8, 'D_new': 8, 'T_change_D': 1000, 'Smooth_transition': 1, 'N_init': 1, 'T': 17, 'epsilon': 0.05}
+#optimal_pp =  {'N': 2500, 'version': 'V2', 'd': 4, 'D': 8, 'r': 0.05, 'r_new': 8, 'D_new': 8, 'T_change_D': 1000, 'Smooth_transition': 1, 'N_init': 1, 'T': 17, 'epsilon': 0.05}
+#optimal_pp["T"] = len(initial)
+
+set = np.zeros([reps,optimal_pp["T"]])
+
+
+###############################################################################################################################################################################################
+#mean for th efirst small part
+for i in tqdm.tqdm(range(reps)):
+    DH = DataHandler("Simulation",optimal_pp,device = "cpu")
+    ts,starting_points  = DH(B = None,L = None,return_plain=True)
+
+    ts = ts.numpy()
+
+    ts -= ts[0]
+
+    
+    if ts[len(initial)-1] == 0: continue
+
+    ts /= ts[len(initial)-1]
+    ts *= initial.numpy()[-1]
+
+    set[i] = ts
+
+#Get the mean 
+set = set[(set[:,-1])!= 0]
+means = np.mean(set,axis=0)
+std = np.std(set,axis=0)
+
+plt.figure(figsize = (30,15))
+
+means -= means[0]
+
+plt.fill_between(x = np.arange(len(means)),y1=means - std,y2 = means + std,color = "orange")
+plt.plot(initial,color = "b",label = "Real",linewidth = 4)
+plt.plot(means,ls = ":",color = "r",label = "mean simulation",linewidth = 4)
+
+plt.plot(means + std,color = "r")
+plt.plot(means - std,color = "r",label = r"1 $\sigma$-interval")
+
+
+plt.xlabel("time [days]",fontsize = fs)
+plt.ylabel("cumulative cases [days]",fontsize = fs)
+plt.xticks(fontsize = fs)
+plt.yticks(fontsize = fs)
+plt.legend(fontsize = fs)
+
+plt.savefig(f"./USA_paper_average_{reps}_initial.jpg")
+
+###############################################################################################################################################################################################
+#optimal_pp =  {'N': 5000, 'version': 'V2', 'd': 4, 'D': 8, 'r': 0.05, 'r_new': 8, 'D_new': 8, 'T_change_D': 1000, 'Smooth_transition': 1, 'N_init': 1, 'T': 17, 'epsilon': 0.05}
 optimal_pp["T"] = len(data_usa)
+optimal_pp["T_change_D"] = 1000
 
 set = np.zeros([reps,optimal_pp["T"]])
 
@@ -259,9 +311,10 @@ plt.xticks(fontsize = fs)
 plt.yticks(fontsize = fs)
 plt.legend(fontsize = fs)
 
-plt.savefig(f"./USA_paper_average_{reps}.jpg")
+plt.savefig(f"./USA_paper_average_{reps}_full.jpg")
 plt.show()
 
 with open("optimal_pp.json","w") as file:
     json.dump(optimal_pp,file)
 
+print(optimal_pp)
