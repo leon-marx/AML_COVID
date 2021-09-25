@@ -18,15 +18,16 @@ num_layers = 2
 nonlinearity = "tanh"
 dropout = 0.5
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 100
+n_epochs = 10
 learning_rate = 0.0001
 backtime = 20  # number of days the network gets to see before prediction
 foretime = 3  # number of days to predict for long predictions
 batch_length = 250
 train_ratio = 0.7
-batch_size = 16
+batch_size = 1024
 DATA_PATH = "data_path.pt"
 PP_PATH = "PP_path.pt"
+LOG_FOLDER = "Training_Logs"
 
 # Models
 print("Initializing Models")
@@ -70,17 +71,23 @@ optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=learning_rate)
 
 def training_loop(model, name):
     # Training
+    final_train_losses = []
+    final_test_losses = []
     t_loop = tqdm.trange(n_epochs, leave=True)
     for epoch in t_loop:
+        train_losses = []
         for X, X_PP, y in training_dataloader:
             train_loss = model.train_model(training_X=X, training_PP=X_PP, training_y=y, loss_fn=loss_fn, optimizer=optimizer)
             t_loop.set_description(f"Epoch: {epoch}, Training Loss: {train_loss}")
+            train_losses.append(train_loss)
+        final_train_losses.append(np.mean(train_losses))
         if epoch % 100 == 0:
             test_losses = []
             for X_t, X_PP_t, y_t in test_dataloader:
                 test_loss = model.test_model(test_X=X_t, test_PP=X_PP_t, test_y=y_t, loss_fn=loss_fn)
                 test_losses.append(test_loss)
             print(f"Average Test Loss: {np.mean(test_losses)}")
+            final_test_losses.append(np.mean(test_losses))
 
     # Plotting Long Predictions
     for X, X_PP, y in test_dataloader:
@@ -103,8 +110,18 @@ def training_loop(model, name):
         plt.scatter(y, test_slice_y, color="C0", marker="x", label="Truth")
         plt.ylim((-0.1, 1.1))
         plt.legend()
-    plt.savefig(f"{name}_Long_Predictions.png")
-    torch.save(mylstm.state_dict(), f"Trained_{name}_Model")
+    if name == "RNN":
+        save_string = f"{name}-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity_{nonlinearity}-learning_rate_{learning_rate}"
+    else:
+        save_string = f"{name}-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout_{dropout}-learning_rate_{learning_rate}"
+    plt.savefig(f"{LOG_FOLDER}/{save_string}_Long_Predictions.png")
+    with open(f"{LOG_FOLDER}/{save_string}_train.txt", "w") as file:
+        for loss in final_train_losses:
+            file.write(str(loss) + "\n")
+    with open(f"{LOG_FOLDER}/{save_string}_test.txt", "w") as file:
+        for loss in final_test_losses:
+            file.write(str(loss) + "\n")
+    torch.save(model.state_dict(), f"{LOG_FOLDER}/{save_string}.pt")
 
 # LSTM Training
 print("Training LSTM")
