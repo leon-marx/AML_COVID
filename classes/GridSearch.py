@@ -79,11 +79,7 @@ class GridSearch_PP_finder():
 
         return ts
 
-<<<<<<< HEAD
-    def __call__(self,params_real, max_evals=1000):
-=======
     def __call__(self,params_real):
->>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
 
         #Get the real time series
         ts_real = self.get_time_series("Real", params_real)
