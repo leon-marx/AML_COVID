@@ -87,7 +87,7 @@ def tune_rnn(hidden_size, num_layers, nonlinearity, learning_rate):
     with open(f"{LOG_FOLDER}/RNN-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity_{nonlinearity}-learning_rate_{learning_rate}_test.txt", "w") as file:
         for loss in test_losses:
             file.write(str(loss) + "\n")
-    torch.save(myrnn.state_dict(), f"{LOG_FOLDER}/RNN_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity_{nonlinearity}-learning_rate_{learning_rate}")
+    torch.save(myrnn.state_dict(), f"{LOG_FOLDER}/RNN_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-nonlinearity_{nonlinearity}-learning_rate_{learning_rate}.pt")
     print("")
     print("")
     print("")
@@ -129,7 +129,7 @@ def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
     with open(f"{LOG_FOLDER}/LSTM-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout_{dropout}-learning_rate_{learning_rate}_test.txt", "w") as file:
         for loss in test_losses:
             file.write(str(loss) + "\n")
-    torch.save(mylstm.state_dict(), f"{LOG_FOLDER}/LSTM_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout_{dropout}-learning_rate_{learning_rate}")
+    torch.save(mylstm.state_dict(), f"{LOG_FOLDER}/LSTM_Model-hidden_size_{hidden_size}-num_layers_{num_layers}-dropout_{dropout}-learning_rate_{learning_rate}.pt")
     print("")
     print("")
     print("")
