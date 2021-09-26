@@ -24,11 +24,11 @@ batch_size = 4096
 random_seed = 17
 
 # Parameters to Tune
-hidden_size_list = [512] # [256, 512]
+hidden_size_list = [256] # [256, 512]
 num_layers_list = [2] #[1, 2]
 dropout_list = [0.0, 0.5]
 nonlinearity_list = ["tanh", "relu"]
-learning_rate_list = [0.0001, 0.001, 0.01] #[0.00001, 0.0001, 0.001, 0.01]
+learning_rate_list = [0.0001] #, 0.001, 0.01] #[0.00001, 0.0001, 0.001, 0.01]
 
 # Dataloader
 train_inds, test_inds = torch.utils.data.random_split(
