@@ -26,7 +26,7 @@ for file in files:
         plt.ylabel("cumulative cases [days]",fontsize = fs)
         plt.xticks(fontsize = fs)
         plt.yticks(fontsize = fs)
-        plt.axvspan(low_bnd, up_bnd, color='red', alpha=0.5)
+        #plt.axvspan(low_bnd, up_bnd, color='red', alpha=0.5)
         plt.legend(fontsize = fs)
 
         plt.savefig(f"./real_cumulative_curves/{file.replace('.txt','')}.jpg")
