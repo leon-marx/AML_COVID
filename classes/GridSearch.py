@@ -8,6 +8,7 @@ import torch
 import random
 import pandas as pd
 import time
+import json
 
 class GridSearch_PP_finder():
     def __init__(self, pp_grid, eval_num = 10, N_pop = 1000, version = "V2",device = "cuda" if torch.cuda.is_available() else "cpu", mode="random"):
@@ -22,6 +23,7 @@ class GridSearch_PP_finder():
                                     if "full_grid" -> use cartesian product of pp specified in pp_grid
         '''
         assert all(key in pp_grid for key in ['epsilon','d','D','r','N_init'])
+
         self.mode = mode
         self.eval_num = eval_num
         self.pp_grid = pp_grid
@@ -178,25 +180,37 @@ class GridSearch_PP_finder():
 
 if __name__ == "__main__": 
 
-
-    import json
-
-    N_pop = 1500
+    N_pop = 2500
     simulation_version = 'V2'
-    eval_num = 3
-    mode =  "full_grid" #"random" #
+    eval_num = 1500
+    mode =  "random" #"full_grid"
+
+    pp_grid= {
+        "epsilon": [0.01,0.05,0.1],
+        "D": [1,2,3,4,5,6,7,8,9,10], #[5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
+        "D_new": [1,2,3,4,5,6,7,8,9,10],
+        "r": [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1], #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
+        "r_new": [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1],
+        "d": list(np.linspace(5,6,7)),
+        "N_init": [1,2,3,4,5,6,7,8,9,10], # 20,50,80,100]
+        "T_change_D":[10,15,20,25,30],
+        "Smooth_transition":[1e4],
+     }
+
 
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
     countries = waves.keys()
-    countries = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
+    countries = ["Israel", "UnitedKingdom"] #["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
 
     for country in countries: 
+
         N = waves[country]["N_waves"]
 
         print(f"\n{country}")
 
-        for i in [3]:
+        for i in range(N):
+
             print(f"\t{i+1} of {N}")
 
             params_real = {
@@ -206,20 +220,10 @@ if __name__ == "__main__":
                 "use_running_average":True,
                 "dt_running_average":14
             }
+            
             #params_simulation = {'N': 1500, 'version': 'V2', 'd': 5.333, 'D': 6, 'r': 0.05, 'r_new': 0.05, 'D_new': 6, 'T_change_D': 66, 'Smooth_transition': 1, 'N_init': 9, 'T': 66, 'epsilon': 0.04}
-            pp_grid_reduced = {
-                "epsilon": np.linspace(0.03,0.05,5),
-                "D": [5,6,7],
-                "D_new": [6],
-                "r": np.linspace(0.04,0.06,5),
-                "r_new": [0.05],
-                "d": [4,5,6],
-                "N_init": [8,9,10],
-                "T_change_D":[1e4],
-                "Smooth_transition":[1]
-            }
 
-            gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, device="cpu")
+            gs = GridSearch_PP_finder(pp_grid=pp_grid, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, device="cpu")
             gs(params_real)
 
             #gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)

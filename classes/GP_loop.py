@@ -21,6 +21,6 @@ for comb in combinations:
         "dt_running_average":14
     }
 
-#    gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 240)
-    gp = GP_PP_finder(N_initial_PP_samples = 2,iterations = 3)
+    gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 240)
+#    gp = GP_PP_finder(N_initial_PP_samples = 2,iterations = 3)
     gp(params_real, use_calibrated_values=True)
