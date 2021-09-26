@@ -292,20 +292,14 @@ def compare_lrs(names, losses):
 
 def run_comparison():
     names, losses = get_losses()
-    print("working..")
     best_relu, best_relu_loss, best_tanh, best_tanh_loss = compare_nonlinearity(names, losses)
-    print("working..")
     best_drop, best_drop_loss, best_nodrop, best_nodrop_loss = compare_dropout(names, losses)
-    print("working..")
     best_rnn_1, best_rnn_1_loss, best_rnn_2, best_rnn_2_loss, best_lstm_1, best_lstm_1_loss, best_lstm_2, best_lstm_2_loss = compare_layers(names, losses)
-    print("working..")
     best_rnn_128, best_rnn_128_loss, best_rnn_256, best_rnn_256_loss, best_rnn_512, best_rnn_512_loss, best_lstm_128, best_lstm_128_loss, best_lstm_256, best_lstm_256_loss, best_lstm_512, best_lstm_512_loss = compare_hidden(names, losses)
-    print("working..")
     best_rnn_01, best_rnn_01_loss, best_rnn_001, best_rnn_001_loss, best_rnn_0001, best_rnn_0001_loss, best_rnn_00001, best_rnn_00001_loss, best_lstm_01, best_lstm_01_loss, best_lstm_001, best_lstm_001_loss, best_lstm_0001, best_lstm_0001_loss, best_lstm_00001, best_lstm_00001_loss = compare_lrs(names, losses)
 
-    print(f"AA & BB")
+    print(f"ReLU & Tanh")
     print(f"\hline")
-    print(f"a & b")
-    print(f"c & d)")
+    print(f"{best_relu_loss} & {best_tanh_loss}")
 
 run_comparison()
