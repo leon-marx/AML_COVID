@@ -175,6 +175,7 @@ class DataHandler():
 
             running_averag[i] = mean
 
+        return running_averag
 
 def compare_hard_smooth_transition():
     params_simulation = {
