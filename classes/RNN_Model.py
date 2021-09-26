@@ -337,7 +337,7 @@ if __name__ == "__main__":
         y = y
         break
 
-    pred = myrnn.forward_long(X, PP, 50)
+    pred = myrnn.predict_long(X, PP, 50)
     X = X.view(-1)
     PP = PP.view(-1)
     y = y.view(-1)
