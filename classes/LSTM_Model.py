@@ -224,7 +224,7 @@ class LSTM(nn.Module):
         return test_loss
     
     def load_model(self, path="Trained_LSTM_Model"):
-        self.state_dict = torch.load(path)
+        return torch.load(path)
 
     
 # Example use

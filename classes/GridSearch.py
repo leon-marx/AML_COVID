@@ -79,7 +79,11 @@ class GridSearch_PP_finder():
 
         return ts
 
+<<<<<<< HEAD
+    def __call__(self,params_real, max_evals=1000):
+=======
     def __call__(self,params_real):
+>>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
 
         #Get the real time series
         ts_real = self.get_time_series("Real", params_real)
@@ -100,8 +104,9 @@ class GridSearch_PP_finder():
 
         for v in pp_combinations:
 
-            print(i)
             i+= 1
+            print(i)
+            
 
             # Measure time 
             t0 = time.perf_counter()
@@ -180,22 +185,28 @@ if __name__ == "__main__":
 
     import json
 
-    N_pop = 2500
+    N_pop = 1500
     simulation_version = 'V2'
-    eval_num = 1500
-    mode =  "random" #"full_grid"
+    eval_num = 3
+    mode =  "full_grid" #"random" #
 
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
     countries = waves.keys()
     countries = ["UnitedStates", "Israel", "UnitedKingdom"] #["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
 
+<<<<<<< HEAD
+    country_list = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
+
+    for country in ["Israel"]: #waves.keys():
+=======
     for country in countries: 
+>>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
         N = waves[country]["N_waves"]
 
         print(f"\n{country}")
 
-        for i in range(N):
+        for i in [3]:
             print(f"\t{i+1} of {N}")
 
             params_real = {
@@ -205,36 +216,25 @@ if __name__ == "__main__":
                 "use_running_average":True,
                 "dt_running_average":14
             }
-
-            pp_grid_old = {
-                "epsilon": [0.1],
-                "D": [5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
-                "r": [0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
-                "d": list(np.linspace(5,10,6)),
-                "N_init": [5,10,20,50,80,100]
-            }
-
+            #params_simulation = {'N': 1500, 'version': 'V2', 'd': 5.333, 'D': 6, 'r': 0.05, 'r_new': 0.05, 'D_new': 6, 'T_change_D': 66, 'Smooth_transition': 1, 'N_init': 9, 'T': 66, 'epsilon': 0.04}
             pp_grid_reduced = {
-                "epsilon": [0.01,0.05,0.1],
-                "D": [1,2,3,4,5,6,7,8,9,10], #[5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
-                "D_new": [1,2,3,4,5,6,7,8,9,10],
-                "r": [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1], #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(5,10,6)), #[0.05], #list(np.linspace(0.05,0.2,4)),
-                "r_new": [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1],
-                "d": list(np.linspace(5,6,7)),
-                "N_init": [1,2,3,4,5,6,7,8,9,10], # 20,50,80,100]
-                "T_change_D":[10,15,20,25,30],
-                "Smooth_transition":[1e4]
+                "epsilon": np.linspace(0.03,0.05,5),
+                "D": [5,6,7],
+                "D_new": [6],
+                "r": np.linspace(0.04,0.06,5),
+                "r_new": [0.05],
+                "d": [4,5,6],
+                "N_init": [8,9,10],
+                "T_change_D":[1e4],
+                "Smooth_transition":[1]
             }
 
-            pp_grid = {
-                "epsilon": list(np.linspace(0.05,0.2, 4)), #[0.1],
-                "D": list(np.linspace(5,10,6,dtype=int)), # [5,8,10,15,20], # [5], list(np.linspace(5,10,6)), #[5,10], #list(np.linspace(5,10,6)),
-                "r": list(np.linspace(0.01,0.2,20)), #[0.01, 0.02, 0.05, 0.1, 0.15, 0.2], #[0.02], # #list(np.linspace(0.01,0.2,19)), #[0.05], #list(np.linspace(0.05,0.2,4)),
-                "d": list(np.linspace(5,10,6,dtype=int)),
-                "N_init": list(np.linspace(5,100,20,dtype=int)) #[5,10,20,50,80,100]
-            }
 
+<<<<<<< HEAD
+            gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version="V2", iterations = 60, device="cpu")
+=======
             gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, device="cpu")
+>>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
             gs(params_real)
 
             #gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)
