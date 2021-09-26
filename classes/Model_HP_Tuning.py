@@ -118,6 +118,7 @@ def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
         for X, X_PP, y in training_dataloader:
             train_loss = mylstm.train_model(training_X=X, training_PP=X_PP, training_y=y, loss_fn=loss_fn, optimizer=optimizer)
             t_loop.set_description(f"Epoch: {epoch}, Training Loss: {train_loss}")
+            train_losses.append(train_loss)
         if epoch % 100 == 0:
             test_losses = []
             for X_t, X_PP_t, y_t in test_dataloader:
