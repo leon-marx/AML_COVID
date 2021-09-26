@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import Dataset
 import Datahandler
-from tqdm import tqdm
+from tqdm import tqdm, trange
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 
@@ -197,7 +197,7 @@ class LSTM(nn.Module):
         optimizer.step()
         return loss.item()
 
-    def test_model(self, test_X, test_PP, test_y, loss_fn):
+    def test_model(self, test_X, test_PP, test_y, loss_fn, n_days=0):
         """
         test_X: should be a time series of shape (backtime, N, input_size) with:
             backtime: as in init
@@ -218,6 +218,8 @@ class LSTM(nn.Module):
             input_size: as above, generally 1
         loss_fn: use the loss functions provided by pytorch
         """
+        if n_days == 0:
+            n_days = self.foretime
         # Put on GPU if possible
         test_X = test_X.to(device)
         test_PP = test_PP.to(device)
@@ -226,14 +228,14 @@ class LSTM(nn.Module):
         self.eval()
         with torch.no_grad():
             # Compute prediction error
-            pred = self.predict_long(test_X, test_PP, self.foretime).to(device)
+            pred = self.predict_long(test_X, test_PP, n_days).to(device)
             test_loss = loss_fn(pred, test_y).item()
         return test_loss
 
     def load_model(self, path="Trained_LSTM_Model"):
         self.load_state_dict(torch.load(path))
 
-    def apply_PP_fit(self, real_data, PP_min, PP_max, loss_fn):
+    def apply_PP_fit(self, real_data, PP_min, PP_max, PP_step, loss_fn):
         """
         real_Data: should be a time series of shape (L, 1, input_size) with:
             L: sequence length, e.g. 50 days
@@ -301,10 +303,10 @@ if __name__ == "__main__":
     dropout = 0.5
     device = "cuda" if torch.cuda.is_available() else "cpu"
     backtime = 10  # number of days the network gets to see before prediction
-    foretime = 3  # number of days to predict for long predictions
+    foretime = 1  # number of days to predict for long predictions
     batch_length = 250
     train_ratio = 0.7
-    batch_size = 1
+    batch_size = 2#048
     DATA_PATH = "data_path.pt"
     PP_PATH = "PP_path.pt"
     PP_min = torch.Tensor([1, 1, 0.01, 1, 0.01])
@@ -317,15 +319,16 @@ if __name__ == "__main__":
                   dropout=dropout,
                   foretime=foretime,
                   backtime=backtime)
-
-    mylstm.load_model(path="Training_Logs/LSTM-hidden_size_256-num_layers_2-dropout_0.5-learning_rate_0.0001.pt")
-
+    mylstm.load_model("foretime_1_model.pt")
     mylstm.to(device)
 
-    loss_fn = torch.nn.MSELoss()
-
-    train_inds, test_inds = torch.utils.data.random_split(torch.arange(batch_length), [int(batch_length*train_ratio), batch_length-int(batch_length*train_ratio)], generator=torch.Generator().manual_seed(17))
-
+    # mylstm.load_model(path="Training_Logs/LSTM-hidden_size_256-num_layers_2-dropout_0.5-learning_rate_0.0001.pt")
+    train_inds, test_inds = torch.utils.data.random_split(
+        torch.arange(batch_length), 
+        [int(batch_length*train_ratio), batch_length - int(batch_length*train_ratio)], 
+        generator=torch.Generator().manual_seed(17))
+    train_losses = []
+    n_epochs = 1000
     def my_collate(batch):
         x = torch.zeros(size=(backtime, len(batch), 1))
         pp = torch.zeros(size=(backtime, len(batch), 5))
@@ -335,23 +338,44 @@ if __name__ == "__main__":
             pp[:, i, :] = item[1]
             y[:, i, :] = item[2]
         return x, pp, y
-
     training_data = Dataset.Dataset(DATA_PATH, PP_PATH, train_inds, backtime=backtime, foretime=foretime)
     test_data = Dataset.Dataset(DATA_PATH, PP_PATH, test_inds, backtime=backtime, foretime=foretime)
     training_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
     test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
-
+    loss_fn = torch.nn.MSELoss()
+    optimizer = torch.optim.Adam(params=mylstm.parameters(), lr=0.0001)
+    """
+    t_loop = trange(n_epochs, leave=True)
+    for epoch in t_loop:
+        for X, X_PP, y in training_dataloader:
+            train_loss = mylstm.train_model(training_X=X, training_PP=X_PP, training_y=y, loss_fn=loss_fn, optimizer=optimizer)
+            t_loop.set_description(f"Epoch: {epoch}, Training Loss: {train_loss}")
+            train_losses.append(train_loss)
+        if epoch % 100 == 0:
+            test_losses = []
+            for X_t, X_PP_t, y_t in test_dataloader:
+                test_loss = mylstm.test_model(test_X=X_t, test_PP=X_PP_t, test_y=y_t, loss_fn=loss_fn)
+                test_losses.append(test_loss)
+            print(f"Average Test Loss: {np.mean(test_losses)}")
+    """
     for X, PP, y in test_dataloader:
-        X = X
-        PP = PP
-        y = y
-        break
+        X = X[:, 0, :].view(-1)
+        PP = PP[:, 0, :].view(-1, 1, 5)
+        y = y[:, 0, :].view(-1)
+        
+        plt.figure(figsize=(6, 4))
+        plt.plot(np.arange(len(X)), X, label="Input", color="C0")
+        plt.scatter(np.arange(len(X), len(X)+len(y)), y,label="Truth", color="C0", marker="x")
+        plt.ylim((-0.1, 1.1))
+        plt.legend()
+        plt.show()
 
-    pred = mylstm.forward_long(X, PP, 50)
+    pred = mylstm.predict_long(X, PP, 50)
     X = X.view(-1)
-    PP = PP.view(-1)
+    # PP = PP.view(-1)
     y = y.view(-1)
     pred = pred.view(-1).detach().numpy()
+    torch.save(mylstm.state_dict(), f"foretime_1_model.pt")
 
     plt.figure(figsize=(12, 8))
     plt.plot(np.arange(len(X)), X, label="Input", color="C0")
@@ -360,7 +384,7 @@ if __name__ == "__main__":
     plt.ylim((-0.1, 1.1))
     plt.legend()
     plt.show()
-
+    """
     params_real = {"file": "Israel.txt", "wave": 3, "full": True, "use_running_average": False, "dt_running_average": 14}
 
     DH = Datahandler.DataHandler("Real", params_real, device=device)
@@ -369,3 +393,4 @@ if __name__ == "__main__":
     fitting_PP, fitting_loss = mylstm.apply_PP_fit(fit_data.view(fit_data.shape[0], 1, 1).type(torch.float32), PP_min, PP_max, PP_step, loss_fn)
     print(fitting_PP)
     print(fitting_loss)
+    """
