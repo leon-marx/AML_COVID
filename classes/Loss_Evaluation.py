@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 import LSTM_Model
 import RNN_Model
 import Dataset
+import Datahandler
 
 data_version = 2
 directory = "C:/Users/gooog/Desktop/AML/final_project/repository/AML_COVID/data/Tuning_Logs/"
@@ -41,6 +42,12 @@ def get_losses():
     losses = []
     for filename in os.listdir(directory):
         if filename[-4:] != ".txt":
+            if "Best" in filename:
+                continue
+            if "NN_PP_" in filename:
+                continue
+            if "plot" in filename:
+                continue
             data = filename.split("-")
             name = data[0]
             hidden_size = int(data[1][-3:])
@@ -78,9 +85,6 @@ def plot_predictions(filename):
         dropout = float(data[3][8:])
         model = LSTM_Model.LSTM(input_size=1, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
     model.load_model(directory+filename)
-    model.to("cpu")
-    torch.save(model.state_dict(), directory + f"Best_{name}.pt")
-    model.to("cuda")
     X = 0
     PP = 0
     y = 0
@@ -101,9 +105,11 @@ def plot_predictions(filename):
         plt.scatter(np.arange(len(X), len(X)+len(y)), y,label="Truth", color="C0", marker="x")
         plt.plot(np.arange(len(X), len(X)+len(pred)), pred, label="Prediction", color="C1")
         plt.ylim((-0.1, 1.1))
-        plt.title(filename.replace("_", " ").replace("-", " "))
-        plt.legend()
-        plt.show()
+        plt.xlabel("Days", size=14)
+        plt.ylabel("Cumulative cases", size=14)
+        plt.legend(fontsize=12)
+    plt.suptitle(filename.replace("_", " ").replace("-", ", "), size=18)
+    plt.savefig(directory + "plots/prediction_" + name + "_png")
 
 def get_path(type, hidden, layers, spec, lr):
     if lr == 0.00001:
@@ -334,25 +340,55 @@ def plot_loss_decay(names, losses):
 
     plt.figure(figsize=(12, 8))
     plt.plot(np.arange(len(rnn_train_loss)), rnn_train_loss, label="Train Loss", color="C0")
-    plt.title(best_rnn, size=18)
+    plt.title(best_rnn.replace("_", " ").replace("-", ", "), size=18)
     plt.xlabel("Epoch", size=14)
     plt.ylabel("Training Loss", size=14)
     plt.legend(fontsize=12)
-    plt.show()
+    plt.savefig(directory + "plots/prediction_RNN_png")
 
     plt.figure(figsize=(12, 8))
     plt.plot(np.arange(len(lstm_train_loss)), lstm_train_loss, label="Train Loss", color="C0")
-    plt.title(best_lstm, size=18)
+    plt.title(best_lstm.replace("_", " ").replace("-", ", "), size=18)
     plt.xlabel("Epoch", size=14)
     plt.ylabel("Training Loss", size=14)
     plt.legend(fontsize=12)
-    plt.show()
+    plt.savefig(directory + "plots/prediction_LSTM_png")
+
+def run_PP_fit(filename):
+    data = filename.split("-")
+    name = data[0]
+    hidden_size = int(data[1][-3:])
+    num_layers = int(data[2][-1])
+    if "e" not in data[4][14:]:
+        learning_rate = float(data[4][14:])
+    else:
+        learning_rate = float(data[4][14:] + data[5])
+    if name == "RNN_Model":
+        nonlinearity = data[3][13:]
+        model = RNN_Model.RNN(input_size=1, hidden_size=hidden_size, num_layers=num_layers, nonlinearity=nonlinearity)
+    else:
+        dropout = float(data[3][8:])
+        model = LSTM_Model.LSTM(input_size=1, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
+    model.load_model(directory+filename)
+    model.to(device)
+    params_real = {"file": "Israel.txt", "wave": 4, "full": False, "use_running_average": True, "dt_running_average": 14}
+    DH = Datahandler.DataHandler("Real", params_real, device=device)
+    fit_data, starting_points = DH(B=None, L=None, return_plain=True)
+
+    PP_min = torch.Tensor([1, 1, 0.01, 4, 0.01])
+    PP_max = torch.Tensor([10, 10, 0.15, 7, 0.1])
+    PP_step = torch.Tensor([2, 1, 0.01, 1, 0.02])
+
+    fitting_PP, fitting_loss = model.apply_PP_fit(fit_data.view(fit_data.shape[0], 1, 1).type(torch.float32), PP_min, PP_max, PP_step, loss_fn)
+    torch.save(fitting_PP, directory + "NN_PP_fit/fitted_PPs_" + name)
+    torch.save(fitting_loss, directory + "NN_PP_fit/fitting_loss_" + name)
 
 
 names, losses = get_losses()
-# run_comparison(names, losses)
+run_comparison(names, losses)
 best_rnn, best_rnn_loss, best_lstm, best_lstm_loss = get_best(names, losses)
 plot_predictions(best_rnn)
 plot_predictions(best_lstm)
-# plot_loss_decay(names, losses)
-
+plot_loss_decay(names, losses)
+run_PP_fit(best_rnn)
+run_PP_fit(best_lstm)
