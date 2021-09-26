@@ -13,7 +13,7 @@ if data_version == 1:
 else:
     batch_length = 20000
 backtime = 20
-foretime = 3
+foretime = 10
 DATA_PATH = f"C:/Users/gooog/Desktop/AML/final_project/repository/AML_COVID/trainingdata/v{data_version}/data_v{data_version}.pt"
 PP_PATH = f"C:/Users/gooog/Desktop/AML/final_project/repository/AML_COVID/trainingdata/v{data_version}/pp_v{data_version}.pt"
 batch_size = 2048
@@ -78,27 +78,30 @@ def plot_predictions(filename):
         dropout = float(data[3][8:])
         model = LSTM_Model.LSTM(input_size=1, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
     model.load_model(directory+filename)
+    model.to("cpu")
+    torch.save(model.state_dict(), directory + f"Best_{name}.pt")
+    model.to("cuda")
     X = 0
     PP = 0
     y = 0
-    for i in range(5):
+    plt.figure(figsize=(12, 8))
+    for i in range(4):
+        plt.subplot(2, 2, i+1)
         for Xt, PPt, yt in test_dataloader:
             X = Xt[:, 0, :].view(-1, 1, 1)
             PP = PPt[:, 0, :].view(-1, 1, 5)
             y = yt[:, 0, :].view(-1, 1, 1)
             break
         model.to(device)
-        pred = model.predict_long(X, PP, 50)
+        pred = model.predict_long(X, PP, 20)
         X = X.view(-1)
         y = y.view(-1)
         pred = pred.view(-1).detach().numpy()
-
-        plt.figure(figsize=(12, 8))
         plt.plot(np.arange(len(X)), X, label="Input", color="C0")
         plt.scatter(np.arange(len(X), len(X)+len(y)), y,label="Truth", color="C0", marker="x")
         plt.plot(np.arange(len(X), len(X)+len(pred)), pred, label="Prediction", color="C1")
-        # plt.ylim((-0.1, 1.1))
-        plt.title(filename)
+        plt.ylim((-0.1, 1.1))
+        plt.title(filename.replace("_", " ").replace("-", " "))
         plt.legend()
         plt.show()
 
@@ -113,8 +116,7 @@ def get_path(type, hidden, layers, spec, lr):
         path = f"{type}_Model-hidden_size_{hidden}-num_layers_{layers}-dropout_{spec}-learning_rate_{lr_mod}"
     return path
 
-def get_best():
-    names, losses = get_losses()
+def get_best(names, losses):
     best_rnn = None
     best_rnn_loss = np.inf
     best_lstm = None
@@ -267,7 +269,7 @@ def compare_lrs(names, losses):
                 if losses[i] < best_rnn_0001_loss:
                     best_rnn_0001 = name
                     best_rnn_0001_loss = losses[i]
-            elif "learning_rate_1e-5" in name:
+            else:
                 if losses[i] < best_rnn_00001_loss:
                     best_rnn_00001 = name
                     best_rnn_00001_loss = losses[i]
@@ -284,14 +286,13 @@ def compare_lrs(names, losses):
                 if losses[i] < best_lstm_0001_loss:
                     best_lstm_0001 = name
                     best_lstm_0001_loss = losses[i]
-            elif "learning_rate_1e-5" in name:
+            else :
                 if losses[i] < best_lstm_00001_loss:
                     best_lstm_00001 = name
                     best_lstm_00001_loss = losses[i]
     return best_rnn_01, best_rnn_01_loss, best_rnn_001, best_rnn_001_loss, best_rnn_0001, best_rnn_0001_loss, best_rnn_00001, best_rnn_00001_loss, best_lstm_01, best_lstm_01_loss, best_lstm_001, best_lstm_001_loss, best_lstm_0001, best_lstm_0001_loss, best_lstm_00001, best_lstm_00001_loss
 
-def run_comparison():
-    names, losses = get_losses()
+def run_comparison(names, losses):
     best_relu, best_relu_loss, best_tanh, best_tanh_loss = compare_nonlinearity(names, losses)
     best_drop, best_drop_loss, best_nodrop, best_nodrop_loss = compare_dropout(names, losses)
     best_rnn_1, best_rnn_1_loss, best_rnn_2, best_rnn_2_loss, best_lstm_1, best_lstm_1_loss, best_lstm_2, best_lstm_2_loss = compare_layers(names, losses)
@@ -300,6 +301,58 @@ def run_comparison():
 
     print(f"ReLU & Tanh")
     print(f"\hline")
-    print(f"{best_relu_loss} & {best_tanh_loss}")
+    print(f"{np.round(best_relu_loss, 5)} & {np.round(best_tanh_loss, 5)}")
+    print("")
 
-run_comparison()
+    print(f"Dropout & No Dropout")
+    print(f"\hline")
+    print(f"{np.round(best_drop_loss, 5)} & {np.round(best_nodrop_loss, 5)}")
+    print("")
+
+    print(f"Model & 1 Layer & 2 Layers")
+    print(f"\hline")
+    print(f"RNN & {np.round(best_rnn_1_loss, 5)} & {np.round(best_rnn_2_loss, 5)}")
+    print(f"LSTM & {np.round(best_lstm_1_loss, 5)} & {np.round(best_lstm_2_loss, 5)}")
+    print("")
+
+    print(f"Model & 128 Neurons & 256 Neurons & 512 Neurons")
+    print(f"\hline")
+    print(f"RNN & {np.round(best_rnn_128_loss, 5)} & {np.round(best_rnn_256_loss, 5)} & {np.round(best_rnn_512_loss, 5)}")
+    print(f"LSTM & {np.round(best_lstm_128_loss, 5)} & {np.round(best_lstm_256_loss, 5)} & {np.round(best_lstm_512_loss, 5)}")
+    print("")
+
+    print(f"Model & 0.01 & 0.001 & 0.0001 & 0.00001")
+    print(f"\hline")
+    print(f"RNN & {np.round(best_rnn_01_loss, 5)} & {np.round(best_rnn_001_loss, 5)} & {np.round(best_rnn_0001_loss, 5)} & {np.round(best_rnn_00001_loss, 5)}")
+    print(f"LSTM & {np.round(best_lstm_01_loss, 5)} & {np.round(best_lstm_001_loss, 5)} & {np.round(best_lstm_0001_loss, 5)} & {np.round(best_lstm_00001_loss, 5)}")
+    print("")
+
+def plot_loss_decay(names, losses):
+    best_rnn, best_rnn_loss, best_lstm, best_lstm_loss = get_best(names, losses)
+    rnn_train_loss = np.loadtxt(directory + best_rnn[:3] + best_rnn[9:] + "_train.txt")
+    lstm_train_loss = np.loadtxt(directory + best_lstm[:4] + best_lstm[10:] + "_train.txt")
+
+    plt.figure(figsize=(12, 8))
+    plt.plot(np.arange(len(rnn_train_loss)), rnn_train_loss, label="Train Loss", color="C0")
+    plt.title(best_rnn, size=18)
+    plt.xlabel("Epoch", size=14)
+    plt.ylabel("Training Loss", size=14)
+    plt.legend(fontsize=12)
+    plt.show()
+
+    plt.figure(figsize=(12, 8))
+    plt.plot(np.arange(len(lstm_train_loss)), lstm_train_loss, label="Train Loss", color="C0")
+    plt.title(best_lstm, size=18)
+    plt.xlabel("Epoch", size=14)
+    plt.ylabel("Training Loss", size=14)
+    plt.legend(fontsize=12)
+    plt.show()
+
+
+names, losses = get_losses()
+# run_comparison(names, losses)
+best_rnn, best_rnn_loss, best_lstm, best_lstm_loss = get_best(names, losses)
+plot_predictions(best_rnn)
+plot_predictions(best_lstm)
+# plot_loss_decay(names, losses)
+
