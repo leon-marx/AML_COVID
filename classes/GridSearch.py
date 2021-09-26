@@ -79,11 +79,7 @@ class GridSearch_PP_finder():
 
         return ts
 
-<<<<<<< HEAD
-    def __call__(self,params_real, max_evals=1000):
-=======
     def __call__(self,params_real):
->>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
 
         #Get the real time series
         ts_real = self.get_time_series("Real", params_real)
@@ -142,7 +138,7 @@ class GridSearch_PP_finder():
             results.append([current_simulation_parameters, float(mse.cpu().numpy())])
 
             # Break if max_eval
-            if i > self.max_evals:
+            if i > self.eval_num:
                 break
     
         # Sort by mse-loss
@@ -193,15 +189,9 @@ if __name__ == "__main__":
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
     countries = waves.keys()
-    countries = ["UnitedStates", "Israel", "UnitedKingdom"] #["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
+    countries = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
 
-<<<<<<< HEAD
-    country_list = ["Germany", "Sweden", "UnitedStates", "Israel", "UnitedKingdom"]
-
-    for country in ["Israel"]: #waves.keys():
-=======
     for country in countries: 
->>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
         N = waves[country]["N_waves"]
 
         print(f"\n{country}")
@@ -229,12 +219,7 @@ if __name__ == "__main__":
                 "Smooth_transition":[1]
             }
 
-
-<<<<<<< HEAD
-            gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version="V2", iterations = 60, device="cpu")
-=======
             gs = GridSearch_PP_finder(pp_grid=pp_grid_reduced, N_pop=N_pop, eval_num=eval_num, mode=mode, version=simulation_version, device="cpu")
->>>>>>> c076270815acc0d69931f006126e2c8e2caa4d00
             gs(params_real)
 
             #gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 60)
