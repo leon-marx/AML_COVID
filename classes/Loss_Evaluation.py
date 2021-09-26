@@ -59,6 +59,7 @@ def get_losses():
                 loss.append(test_loss)
                 losses.append(np.mean(loss))
                 names.append(filename)
+                break
     return names, losses
 
 def plot_predictions(filename):
