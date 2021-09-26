@@ -18,9 +18,9 @@ num_layers = 2
 nonlinearity = "tanh"
 dropout = 0.5
 device = "cuda" if torch.cuda.is_available() else "cpu"
-n_epochs = 10
+n_epochs = 1000
 learning_rate = 0.0001
-backtime = 20  # number of days the network gets to see before prediction
+backtime = 10  # number of days the network gets to see before prediction
 foretime = 3  # number of days to predict for long predictions
 batch_length = 250
 train_ratio = 0.7
@@ -126,9 +126,19 @@ def training_loop(model, name):
 # LSTM Training
 print("Training LSTM")
 mylstm.to(device)
+mylstm.load_model(path="Training_Logs/LSTM-hidden_size_256-num_layers_2-dropout_0.5-learning_rate_0.0001.pt")
+training_loop(mylstm, "LSTM")
+mylstm.load_model(path="Training_Logs/LSTM-hidden_size_256-num_layers_2-dropout_0.5-learning_rate_0.0001.pt")
+training_loop(mylstm, "LSTM")
+mylstm.load_model(path="Training_Logs/LSTM-hidden_size_256-num_layers_2-dropout_0.5-learning_rate_0.0001.pt")
 training_loop(mylstm, "LSTM")
 
 # RNN Training
 print("Training RNN")
 myrnn.to(device)
+myrnn.load_model(path="Training_Logs/RNN-hidden_size_256-num_layers_2-nonlinearity_tanh-learning_rate_0.0001.pt")
+training_loop(myrnn, "RNN")
+myrnn.load_model(path="Training_Logs/RNN-hidden_size_256-num_layers_2-nonlinearity_tanh-learning_rate_0.0001.pt")
+training_loop(myrnn, "RNN")
+myrnn.load_model(path="Training_Logs/RNN-hidden_size_256-num_layers_2-nonlinearity_tanh-learning_rate_0.0001.pt")
 training_loop(myrnn, "RNN")
