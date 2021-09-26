@@ -197,7 +197,7 @@ class LSTM(nn.Module):
         optimizer.step()
         return loss.item()
 
-    def test_model(self, test_X, test_PP, test_y, loss_fn):
+    def test_model(self, test_X, test_PP, test_y, loss_fn, n_days=0):
         """
         test_X: should be a time series of shape (backtime, N, input_size) with:
             backtime: as in init
@@ -218,6 +218,8 @@ class LSTM(nn.Module):
             input_size: as above, generally 1
         loss_fn: use the loss functions provided by pytorch
         """
+        if n_days == 0:
+            n_days = self.foretime
         # Put on GPU if possible
         test_X = test_X.to(device)
         test_PP = test_PP.to(device)
@@ -226,7 +228,7 @@ class LSTM(nn.Module):
         self.eval()
         with torch.no_grad():
             # Compute prediction error
-            pred = self.predict_long(test_X, test_PP, self.foretime).to(device)
+            pred = self.predict_long(test_X, test_PP, n_days).to(device)
             test_loss = loss_fn(pred, test_y).item()
         return test_loss
 
