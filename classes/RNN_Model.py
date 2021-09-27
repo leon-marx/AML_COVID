@@ -187,7 +187,7 @@ class RNN(nn.Module):
         optimizer.step()
         return loss.item()   
 
-    def test_model(self, test_X, test_PP, test_y, loss_fn):
+    def test_model(self, test_X, test_PP, test_y, loss_fn, n_days=0):
         """
         test_X: should be a time series of shape (backtime, N, input_size) with:
             backtime: as in init
@@ -208,6 +208,8 @@ class RNN(nn.Module):
             input_size: as above, generally 1
         loss_fn: use the loss functions provided by pytorch
         """
+        if n_days == 0:
+            n_days = self.foretime
         # Put on GPU if possible
         test_X = test_X.to(device)
         test_PP = test_PP.to(device)
@@ -216,7 +218,43 @@ class RNN(nn.Module):
         self.eval()
         with torch.no_grad():
             # Compute prediction error
-            pred = self.predict_long(test_X, test_PP, self.foretime).to(device)
+            pred = self.predict_long(test_X, test_PP, n_days).to(device)
+            test_loss = loss_fn(pred, test_y).item()
+        return test_loss
+
+    def test_model_weighted(self, test_X, test_PP, test_y, loss_fn, n_days=0):
+        """
+        test_X: should be a time series of shape (backtime, N, input_size) with:
+            backtime: as in init
+            N: batch_size
+            input_size: as above, generally 1
+        test_PP: pandemic parameters, tensor of shape (L, N, input_size) with:
+            L: sequence length, e.g. 50 days
+            N: batch_size
+            5: the 5 different PP-values:
+                N_pop: population size
+                D: average degree of social network in population
+                r: daily transmission rate between two individuals which were in contact
+                d: duration of the infection
+                epsilon: rate of cross-contacts
+        test_y: should be a time series of shape (foretime, N, input_size) with:
+            foretime: as in init
+            N: batch_size
+            input_size: as above, generally 1
+        loss_fn: use the loss functions provided by pytorch
+        """
+        if n_days == 0:
+            n_days = self.foretime
+        # Put on GPU if possible
+        test_X = test_X.to(device)
+        test_PP = test_PP.to(device)
+        test_y = test_y.to(device)
+
+        self.eval()
+        with torch.no_grad():
+            # Compute prediction error
+            pred = self.predict_long(test_X, test_PP, n_days).to(device)
+            pred /= torch.arange(1, pred.shape[0]+1).pow(0.2).repeat(pred.shape[1], 1).T.view(pred.shape[0], pred.shape[1], pred.shape[2]).to(device)
             test_loss = loss_fn(pred, test_y).item()
         return test_loss
     
@@ -337,7 +375,7 @@ if __name__ == "__main__":
         y = y
         break
 
-    pred = myrnn.forward_long(X, PP, 50)
+    pred = myrnn.predict_long(X, PP, 50)
     X = X.view(-1)
     PP = PP.view(-1)
     y = y.view(-1)

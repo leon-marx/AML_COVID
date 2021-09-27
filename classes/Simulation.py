@@ -499,7 +499,7 @@ class World():
 
         return ill_recoverd / self.N
 
-    def plotter(self,matrix,marker = None,name = None,cols_subplots = None,rows_subplots = None,subplot_index = None,title = None,fs = 35,ms = 100):
+    def plotter(self,matrix,marker = None,name = None,cols_subplots = None,rows_subplots = None,subplot_index = None,title = None,fs = 50,ms = 100):
         r_x = 11
         r_y = 11
 
@@ -512,6 +512,7 @@ class World():
         else:
             plt.subplot(rows_subplots,cols_subplots,subplot_index)
             plt.title(title,fontsize = fs)
+            plt.tight_layout()
 
         plt.axis("off")
 
@@ -557,10 +558,10 @@ def visualization_pandemic_dynamics(version = "V2"):
     n_cols = 4
     n_rows = 2
 
-    fs = 30
+    fs = 55
 
     plt.figure(figsize = (n_cols * width, n_rows * width))
-    W.plotter(matrix=W.Network,cols_subplots=n_cols,rows_subplots=n_rows,subplot_index=1,title="T = 0",ms = 55)
+    W.plotter(matrix=W.Network,cols_subplots=n_cols,rows_subplots=n_rows,subplot_index=1,title="T = 0",ms = 65,fs = fs)
     n = 2
 
     cases = []
@@ -570,12 +571,12 @@ def visualization_pandemic_dynamics(version = "V2"):
         cases.append(c)
 
         if i % interval == 0: 
-            W.plotter(matrix=W.Network,cols_subplots=n_cols,rows_subplots=n_rows,subplot_index=n,title=f"T = {i}",ms = 45)
+            W.plotter(matrix=W.Network,cols_subplots=n_cols,rows_subplots=n_rows,subplot_index=n,title=f"T = {i}",ms = 65,fs = fs)
 
             plt.subplot(n_rows,n_cols,n+n_cols)
             plt.plot(cases, linewidth=6)
             plt.xlabel("time [days]",fontsize = fs)
-            plt.ylabel("relative count of infected individuals since t = 0 []",fontsize = fs)
+            plt.ylabel("cumulative cases []",fontsize = fs)
             plt.xticks(fontsize = fs)
             plt.yticks(fontsize = fs)
             plt.xlim([0,46])
@@ -583,7 +584,7 @@ def visualization_pandemic_dynamics(version = "V2"):
 
             n += 1
 
-    plt.savefig(f"./evaluation_report/pandemic_dynamics_{version}.jpg")
+    plt.savefig(f"pandemic_dynamics_{version}.jpg")
 
 def compare_V2_V3(reps,sets):
     
@@ -692,7 +693,10 @@ def visualize_reduced_degree_pandemic_dynamics(version,T_change = 10):
 
 if __name__ == "__main__":
 
-    Eval = True
+    visualization_pandemic_dynamics("V2")
+    visualization_pandemic_dynamics("V3")
+
+    Eval = False
 
     if Eval:
         print("Visualize initialization...")
@@ -741,3 +745,4 @@ if __name__ == "__main__":
         plt.close()
 
         # compare_V2_V3(reps = 25,sets = 9)
+
