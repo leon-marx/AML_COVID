@@ -18,6 +18,8 @@ import ast
 if __name__ == "__main__":
 
     #num_pp_eval = 50
+    fs = 30
+
     cost_threshold = 0.01
 
     with open("./classes/Countries/wave_regions.json","r") as file:
@@ -58,6 +60,11 @@ if __name__ == "__main__":
                 all_pps[i] = np.array(list(optim_pp_list_reduced[i].values()))
 
             plt.figure(figsize = (30,15))
-            plt.boxplot(all_pps,labels=keys)
-            plt.title(f'{country} | wave {wave_id} | N = {N[0]} | Best {num_pp_eval} pp combinations with loss <= {cost_threshold}')
-            plt.savefig(f"./data/boxplots/boxplot_{country}_wave_{wave_id}_paper_average_{num_pp_eval}_initial.jpg")
+            boxprops = dict(linewidth=2)
+            whiskerprops=dict(linewidth=1.0)
+            plt.boxplot(all_pps,labels=keys, boxprops=boxprops, whiskerprops=whiskerprops)
+            plt.xlabel("pandemic parameters", fontsize=fs)
+            plt.xticks(fontsize=fs*3/4, rotation=90)
+            plt.yticks(fontsize=fs*3/4, rotation=90)
+            plt.title(f'{country} | wave {wave_id} | N = {N[0]} | Best {num_pp_eval} pp combinations with loss <= {cost_threshold}',fontsize=fs)
+            plt.savefig(f"./data/boxplots/boxplot_{country}_wave_{wave_id}_paper_average_{num_pp_eval}_initial_new.jpg")
