@@ -195,8 +195,8 @@ if __name__ == "__main__":
 
     #print("Compare the full time series...")
     fs = 30
-    reps = 2
-    num_pp_eval = 5
+    reps = 1
+    num_pp_eval = 50
 
     with open("./classes/Countries/wave_regions.json","r") as file:
         waves = json.load(file)
@@ -218,72 +218,97 @@ if __name__ == "__main__":
             cum_inf_data_country = cum_inf_data_country[waves[country][wave_id][0]:waves[country][wave_id][1]]
             
             #select the initial cases
-            initial = cum_inf_data_country[(cum_inf_data_country <= 1e-3)]
-            initial = torch.tensor(initial)
+            #initial = cum_inf_data_country[(cum_inf_data_country <= 1e-3)]
+            #initial = torch.tensor(initial)
 
             #optimal_pp = {'N': 2500, 'version': 'V2', 'd': 5.833333333333333, 'D': 3, 'r': 0.1, 'r_new': 0.06, 'D_new': 9, 'T_change_D': 136, 'Smooth_transition': 10000.0, 'N_init': 8, 'T': 136, 'epsilon': 0.01}
             df_pp = pd.read_csv(f'./data/gridsearch_results/GS_fit_{country}_{wave_id}.csv')      
             optimal_pp_list = df_pp['0'][:num_pp_eval]
 
             # count number of pps per run 
-            rank = 1
+            #rank = 1
 
-            for optimal_pp in optimal_pp_list:
+            set = np.zeros([num_pp_eval,ast.literal_eval(optimal_pp_list[0])['T']])
+
+            for i in range(len(optimal_pp_list)): #optimal_pp in optimal_pp_list:
                 
-                optimal_pp = ast.literal_eval(optimal_pp)
+                #optimal_pp = ast.literal_eval(optimal_pp)
+                optimal_pp = ast.literal_eval(optimal_pp_list[i])
 
                 #select the initial cases
                 #initial = data_country[(data_country <= 1e-3)]
                 #initial = torch.tensor(initial)
                 #optimal_pp["T"] = len(initial)
 
-                set = np.zeros([reps,optimal_pp["T"]])
+                #set = np.zeros([reps,optimal_pp["T"]])
+                #set = np.zeros([reps,len(cum_inf_data_country)])
+
+
+                #T_calibrated = optimal_pp['T']
+                #optimal_pp['T'] = len(cum_inf_data_country)
 
                 ###############################################################################################################################################################################################
                 #mean for th efirst small part
-                for i in tqdm.tqdm(range(reps)):
-                    DH = DataHandler("Simulation",optimal_pp,device = "cpu")
-                    ts,starting_points  = DH(B = None,L = None,return_plain=True)
+                #for i in tqdm.tqdm(range(reps)):
+                    
+                DH = DataHandler("Simulation",optimal_pp,device = "cpu")
+                ts,starting_points  = DH(B = None,L = None,return_plain=True)
 
-                    ts = ts.numpy()
+                ts = ts.numpy()
 
-                    ts -= ts[0]
+                #print(len(ts))
+                #print(T_calibrated)
 
-                    flag = True
-                    if len(initial) == 0:
-                        flag = False
-                    #    if ts[0] == 0: continue
-                    if flag:
-                        if ts[len(initial)-1] == 0: continue
-
-                        ts /= ts[len(initial)-1]
-                        ts *= initial.numpy()[-1]
-
-                    set[i] = ts
-
-                #Get the mean 
-                set = set[(set[:,-1])!= 0]
-                means = np.mean(set,axis=0)
-                std = np.std(set,axis=0)
-
-                plt.figure(figsize = (30,15))
-
-                means -= means[0]
-
-                plt.fill_between(x = np.arange(len(means)),y1=means - std,y2 = means + std,color = "orange")
-                plt.plot(cum_inf_data_country,color = "b",label = "Real",linewidth = 4)
-                plt.plot(means,ls = ":",color = "r",label = "mean simulation",linewidth = 4)
-
-                plt.plot(means + std,color = "r")
-                plt.plot(means - std,color = "r",label = r"1 $\sigma$-interval")
-
-
-                plt.xlabel("time [days]",fontsize = fs)
-                plt.ylabel("cumulative cases [days]",fontsize = fs)
-                plt.xticks(fontsize = fs)
-                plt.yticks(fontsize = fs)
-                plt.legend(fontsize = fs)
-
-                plt.savefig(f"./{country}_wave_{wave_id}_rank_{rank}_paper_average_{reps}_initial.jpg")
+                #ts -= ts[0]
+                #ts /= ts[len(ts)-1]
+                #ts *= cum_inf_data_country[len(ts)-1]
                 
-                rank+=1
+                cum_inf_data_country -= cum_inf_data_country[0]
+                cum_inf_data_country /= cum_inf_data_country[optimal_pp['T']-1]
+
+                    #if len(initial) == 0:
+                    #    if ts[0] == 0:
+                    #        ts *= cum_inf_data_country[0]
+                    #    else:
+                    #        ts /= ts[0] # substract offest
+                    #        ts *= cum_inf_data_country[0] # divide by last value
+                    
+                    #else:                       
+                    #
+                    #    if ts[len(initial)-1] == 0: continue
+
+                    #    ts /= ts[len(initial)-1]
+                    #       ts *= initial.numpy()[-1]
+
+                set[i] = ts
+
+            #Get the mean 
+            set = set[(set[:,-1])!= 0]
+            means = np.mean(set,axis=0)
+            std = np.std(set,axis=0)
+
+            plt.figure(figsize = (30,15))
+
+            means -= means[0]
+
+            #normalize length
+            cum_inf_data_country = cum_inf_data_country[0:len(means)]
+
+            plt.fill_between(x = np.arange(len(means)),y1=means - std,y2 = means + std,color = "orange")
+            plt.plot(cum_inf_data_country[:len(means-1)],color = "b",label = "Real",linewidth = 4)
+            plt.plot(means,ls = ":",color = "r",label = "mean simulation",linewidth = 4)
+
+            plt.plot(means + std,color = "r")
+            plt.plot(means - std,color = "r",label = r"1 $\sigma$-interval")
+
+
+            plt.xlabel("time [days]",fontsize = fs)
+            plt.ylabel("cumulative cases",fontsize = fs)
+            plt.xticks(fontsize = fs)
+            plt.yticks(fontsize = fs)
+            plt.legend(fontsize = fs)
+
+            #plt.savefig(f"./{country}_wave_{wave_id}_rank_{rank}_paper_average_{reps}_final.jpg")
+            plt.savefig(f"./{country}_wave_{wave_id}_best_{num_pp_eval}.png")
+            
+                #rank+=1
