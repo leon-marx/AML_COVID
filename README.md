@@ -6,7 +6,7 @@ July 14, 2021
 
 ### Reproduce the results of the paper ”A network-based explanation of why most COVID-19 infection curves are linear” , try to train a neural network to reproduce the data and test it on real data
 ### 1.1 Summary
-In their paper, Thurner et al. use a network-based model of individuals forming a society in order to simulate the cumulative COVID-19 cases in the United States and Austria. They choose these countries as an example of one country with rather few countermeasures, and one with stricter countermeasures in the beginning of the pandemic. We try to reproduced their results, and expand it in several ways:
+In their paper, Thurner et al. [PNAS, 2015] use a network-based model of individuals forming a society in order to simulate the cumulative COVID-19 cases in the United States and Austria. They choose these countries as an example of one country with rather few countermeasures, and one with stricter countermeasures in the beginning of the pandemic. We try to reproduced their results, and expand it in several ways:
 * We use a grid search as well as Gaussian Processes in order to calibrate the simulation to real data.
 * We allow for the simulation parameters to change in order calibrate the simulation to a lockdown happening.
 * We use the simulaion in order to train several recurrent neural networks on a large artificial dataset, comparing different architectures and hyperparameter combinations.
