@@ -8,13 +8,13 @@ import Dataset
 import Datahandler
 
 data_version = 2
-directory = "C:/Users/gooog/Desktop/AML/final_project/repository/AML_COVID/data/Tuning_Logs/"
+directory = "C:/Users/gooog/Desktop/AML/final_project/repository/AML_COVID/data/Evaluation/"
 if data_version == 1:
     batch_length = 20
 else:
     batch_length = 20000
 backtime = 20
-foretime = 10
+foretime = 5
 DATA_PATH = f"C:/Users/gooog/Desktop/AML/final_project/repository/AML_COVID/trainingdata/v{data_version}/data_v{data_version}.pt"
 PP_PATH = f"C:/Users/gooog/Desktop/AML/final_project/repository/AML_COVID/trainingdata/v{data_version}/pp_v{data_version}.pt"
 batch_size = 2048
@@ -37,7 +37,7 @@ test_data = Dataset.Dataset(DATA_PATH, PP_PATH, test_inds, backtime=backtime, fo
 training_dataloader = torch.utils.data.DataLoader(training_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
 test_dataloader = torch.utils.data.DataLoader(test_data, batch_size=batch_size, shuffle=True, collate_fn=my_collate)
 
-def get_losses():
+def get_losses(old_only=False):
     names = []
     losses = []
     for filename in os.listdir(directory):
@@ -48,6 +48,11 @@ def get_losses():
                 continue
             if "plot" in filename:
                 continue
+            if "comparison" in filename:
+                continue
+            if old_only:
+                if "foretime" in filename:
+                    continue
             data = filename.split("-")
             name = data[0]
             hidden_size = int(data[1][-3:])
@@ -64,20 +69,16 @@ def get_losses():
             for X, PP, y in test_dataloader:
                 test_loss = model.test_model(test_X=X, test_PP=PP, test_y=y, loss_fn=loss_fn, n_days=foretime)
                 loss.append(test_loss)
-                losses.append(np.mean(loss))
-                names.append(filename)
                 break
+            names.append(filename)
+            losses.append(np.mean(loss))
     return names, losses
 
-def plot_predictions(filename):
+def plot_predictions(filename, many=False, length=foretime):
     data = filename.split("-")
     name = data[0]
     hidden_size = int(data[1][-3:])
     num_layers = int(data[2][-1])
-    if "e" not in data[4][14:]:
-        learning_rate = float(data[4][14:])
-    else:
-        learning_rate = float(data[4][14:] + data[5])
     if name == "RNN_Model":
         nonlinearity = data[3][13:]
         model = RNN_Model.RNN(input_size=1, hidden_size=hidden_size, num_layers=num_layers, nonlinearity=nonlinearity)
@@ -85,17 +86,33 @@ def plot_predictions(filename):
         dropout = float(data[3][8:])
         model = LSTM_Model.LSTM(input_size=1, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
     model.load_model(directory+filename)
-    X = 0
-    PP = 0
-    y = 0
+    def new_my_collate(batch):
+        x = torch.zeros(size=(backtime, len(batch), 1))
+        pp = torch.zeros(size=(backtime, len(batch), 5))
+        y = torch.zeros(size=(length, len(batch), 1))
+        for i, item in enumerate(batch):
+            x[:, i, :] = item[0]
+            pp[:, i, :] = item[1]
+            y[:, i, :] = item[2]
+        return x, pp, y
+    new_training_data = Dataset.Dataset(DATA_PATH, PP_PATH, train_inds, backtime=backtime, foretime=length)
+    new_test_data = Dataset.Dataset(DATA_PATH, PP_PATH, test_inds, backtime=backtime, foretime=length)
+    new_training_dataloader = torch.utils.data.DataLoader(new_training_data, batch_size=batch_size, shuffle=True, collate_fn=new_my_collate)
+    new_test_dataloader = torch.utils.data.DataLoader(new_test_data, batch_size=batch_size, shuffle=True, collate_fn=new_my_collate)
+    Xs = 0
+    PPs = 0
+    ys = 0
     plt.figure(figsize=(12, 8))
-    for i in range(4):
-        plt.subplot(2, 2, i+1)
-        for Xt, PPt, yt in test_dataloader:
-            X = Xt[:, 0, :].view(-1, 1, 1)
-            PP = PPt[:, 0, :].view(-1, 1, 5)
-            y = yt[:, 0, :].view(-1, 1, 1)
-            break
+    for Xt, PPt, yt in new_test_dataloader:
+        Xs = Xt
+        PPs = PPt
+        ys = yt
+        break
+    for i in range(9):
+        plt.subplot(3, 3, i+1)
+        X = Xs[:, i, :].view(-1, 1, 1)
+        PP = PPs[:, i, :].view(-1, 1, 5)
+        y = ys[:, i, :].view(-1, 1, 1)
         model.to(device)
         pred = model.predict_long(X, PP, 20)
         X = X.view(-1)
@@ -109,7 +126,12 @@ def plot_predictions(filename):
         plt.ylabel("Cumulative cases", size=14)
         plt.legend(fontsize=12)
     plt.suptitle(filename.replace("_", " ").replace("-", ", "), size=18)
-    plt.savefig(directory + "plots/prediction_" + name + "_png")
+    if many:
+        plt.savefig(directory + "plots/many/prediction_" + f"_{filename}.png")
+        plt.close()
+    else:
+        plt.savefig(directory + "plots/prediction_" + name + f"_{foretime}_png")
+        plt.close()
 
 def get_path(type, hidden, layers, spec, lr):
     if lr == 0.00001:
@@ -305,38 +327,48 @@ def run_comparison(names, losses):
     best_rnn_128, best_rnn_128_loss, best_rnn_256, best_rnn_256_loss, best_rnn_512, best_rnn_512_loss, best_lstm_128, best_lstm_128_loss, best_lstm_256, best_lstm_256_loss, best_lstm_512, best_lstm_512_loss = compare_hidden(names, losses)
     best_rnn_01, best_rnn_01_loss, best_rnn_001, best_rnn_001_loss, best_rnn_0001, best_rnn_0001_loss, best_rnn_00001, best_rnn_00001_loss, best_lstm_01, best_lstm_01_loss, best_lstm_001, best_lstm_001_loss, best_lstm_0001, best_lstm_0001_loss, best_lstm_00001, best_lstm_00001_loss = compare_lrs(names, losses)
 
-    print(f"ReLU & Tanh")
-    print(f"\hline")
-    print(f"{np.round(best_relu_loss, 5)} & {np.round(best_tanh_loss, 5)}")
-    print("")
+    with open(directory + "comparisons/nonlinearity.txt", "w") as f:
+        f.write(f"ReLU & Tanh \n")
+        f.write(f"\hline \n")
+        f.write(f"{np.round(best_relu_loss, 5)} & {np.round(best_tanh_loss, 5)} \n")
+        f.write("")
 
-    print(f"Dropout & No Dropout")
-    print(f"\hline")
-    print(f"{np.round(best_drop_loss, 5)} & {np.round(best_nodrop_loss, 5)}")
-    print("")
+    with open(directory + "comparisons/dropout.txt", "w") as f:
+        f.write(f"Dropout & No Dropout \n")
+        f.write(f"\hline \n")
+        f.write(f"{np.round(best_drop_loss, 5)} & {np.round(best_nodrop_loss, 5)} \n")
+        f.write("")
 
-    print(f"Model & 1 Layer & 2 Layers")
-    print(f"\hline")
-    print(f"RNN & {np.round(best_rnn_1_loss, 5)} & {np.round(best_rnn_2_loss, 5)}")
-    print(f"LSTM & {np.round(best_lstm_1_loss, 5)} & {np.round(best_lstm_2_loss, 5)}")
-    print("")
+    with open(directory + "comparisons/num_layers.txt", "w") as f:
+        f.write(f"Model & 1 Layer & 2 Layers \n")
+        f.write(f"\hline \n")
+        f.write(f"RNN & {np.round(best_rnn_1_loss, 5)} & {np.round(best_rnn_2_loss, 5)} \n")
+        f.write(f"LSTM & {np.round(best_lstm_1_loss, 5)} & {np.round(best_lstm_2_loss, 5)} \n")
+        f.write("")
 
-    print(f"Model & 128 Neurons & 256 Neurons & 512 Neurons")
-    print(f"\hline")
-    print(f"RNN & {np.round(best_rnn_128_loss, 5)} & {np.round(best_rnn_256_loss, 5)} & {np.round(best_rnn_512_loss, 5)}")
-    print(f"LSTM & {np.round(best_lstm_128_loss, 5)} & {np.round(best_lstm_256_loss, 5)} & {np.round(best_lstm_512_loss, 5)}")
-    print("")
+    with open(directory + "comparisons/hidden_size.txt", "w") as f:
+        f.write(f"Model & 128 Neurons & 256 Neurons & 512 Neurons \n")
+        f.write(f"\hline \n")
+        f.write(f"RNN & {np.round(best_rnn_128_loss, 5)} & {np.round(best_rnn_256_loss, 5)} & {np.round(best_rnn_512_loss, 5)} \n")
+        f.write(f"LSTM & {np.round(best_lstm_128_loss, 5)} & {np.round(best_lstm_256_loss, 5)} & {np.round(best_lstm_512_loss, 5)} \n")
+        f.write("")
 
-    print(f"Model & 0.01 & 0.001 & 0.0001 & 0.00001")
-    print(f"\hline")
-    print(f"RNN & {np.round(best_rnn_01_loss, 5)} & {np.round(best_rnn_001_loss, 5)} & {np.round(best_rnn_0001_loss, 5)} & {np.round(best_rnn_00001_loss, 5)}")
-    print(f"LSTM & {np.round(best_lstm_01_loss, 5)} & {np.round(best_lstm_001_loss, 5)} & {np.round(best_lstm_0001_loss, 5)} & {np.round(best_lstm_00001_loss, 5)}")
-    print("")
+    with open(directory + "comparisons/learning_rate.txt", "w") as f:
+        f.write(f"Model & 0.01 & 0.001 & 0.0001 & 0.00001 \n")
+        f.write(f"\hline \n")
+        f.write(f"RNN & {np.round(best_rnn_01_loss, 5)} & {np.round(best_rnn_001_loss, 5)} & {np.round(best_rnn_0001_loss, 5)} & {np.round(best_rnn_00001_loss, 5)} \n")
+        f.write(f"LSTM & {np.round(best_lstm_01_loss, 5)} & {np.round(best_lstm_001_loss, 5)} & {np.round(best_lstm_0001_loss, 5)} & {np.round(best_lstm_00001_loss, 5)} \n")
+        f.write("")
 
 def plot_loss_decay(names, losses):
-    best_rnn, best_rnn_loss, best_lstm, best_lstm_loss = get_best(names, losses)
-    rnn_train_loss = np.loadtxt(directory + best_rnn[:3] + best_rnn[9:] + "_train.txt")
-    lstm_train_loss = np.loadtxt(directory + best_lstm[:4] + best_lstm[10:] + "_train.txt")
+    if rnn_check:
+        rnn_train_loss = np.loadtxt(directory + best_rnn[:3] + best_rnn[9:-3] + "_train.txt")
+    else:
+        rnn_train_loss = np.loadtxt(directory + best_rnn[:3] + best_rnn[9:] + "_train.txt")
+    if lstm_check:
+        lstm_train_loss = np.loadtxt(directory + best_lstm[:4] + best_lstm[10:-3] + "_train.txt")
+    else:
+        lstm_train_loss = np.loadtxt(directory + best_lstm[:4] + best_lstm[10:] + "_train.txt")
 
     plt.figure(figsize=(12, 8))
     plt.plot(np.arange(len(rnn_train_loss)), rnn_train_loss, label="Train Loss", color="C0")
@@ -345,6 +377,7 @@ def plot_loss_decay(names, losses):
     plt.ylabel("Training Loss", size=14)
     plt.legend(fontsize=12)
     plt.savefig(directory + "plots/prediction_RNN_png")
+    plt.close()
 
     plt.figure(figsize=(12, 8))
     plt.plot(np.arange(len(lstm_train_loss)), lstm_train_loss, label="Train Loss", color="C0")
@@ -353,6 +386,7 @@ def plot_loss_decay(names, losses):
     plt.ylabel("Training Loss", size=14)
     plt.legend(fontsize=12)
     plt.savefig(directory + "plots/prediction_LSTM_png")
+    plt.close()
 
 def run_PP_fit(filename):
     data = filename.split("-")
@@ -384,9 +418,27 @@ def run_PP_fit(filename):
     torch.save(fitting_loss, directory + "NN_PP_fit/fitting_loss_" + name)
 
 
-names, losses = get_losses()
+names, losses = get_losses(old_only=False)
 run_comparison(names, losses)
-best_rnn, best_rnn_loss, best_lstm, best_lstm_loss = get_best(names, losses)
+# for name in names:
+#     plot_predictions(name, many=True, length=20)
+# best_rnn, best_rnn_loss, best_lstm, best_lstm_loss = get_best(names, losses)
+# best_rnn = input("Best RNN: ")
+# best_lstm = input("Best LSTM: ")
+best_rnn = "RNN_Model-hidden_size_128-num_layers_1-nonlinearity_tanh-learning_rate_1e-05"
+best_lstm = "LSTM_Model-hidden_size_128-num_layers_1-dropout_0.0-learning_rate_0.0001"
+rnn_check = False
+if "foretime" in best_rnn:
+    print("RNN GOOD")
+    rnn_check = True
+else:
+    print("RNN BAD")
+lstm_check = False
+if "foretime" in best_lstm:
+    print("LSTM GOOD")
+    lstm_check = True
+else:
+    print("LSTM BAD")
 plot_predictions(best_rnn)
 plot_predictions(best_lstm)
 plot_loss_decay(names, losses)
