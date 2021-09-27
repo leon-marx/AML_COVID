@@ -137,7 +137,7 @@ class GP_PP_finder():
                 #Get the simulation for the corresponding pandemic parameters
                 self.simulation_parameters["Smooth_transition"] = 1 #optimal_pp['Smooth_transition']
                 self.simulation_parameters["D_new"] = int(optimal_pp['D_new'])
-                self.simulation_parameters["r_new"] = int(optimal_pp['r']) #int(optimal_pp['r_new'])
+                self.simulation_parameters["r_new"] = optimal_pp['r'] #int(optimal_pp['r_new'])
                 self.simulation_parameters["T_change_D"] = int(optimal_pp['T_change_D'])
 
                 self.simulation_parameters["D"] = int(optimal_pp['D'])
@@ -201,7 +201,7 @@ class GP_PP_finder():
             self.simulation_parameters["N_init"] = int(q_opt["x4"])
             self.simulation_parameters["epsilon"] = q_opt["x1"]
             self.simulation_parameters["D_new"] = int(q_opt["x6"])
-            #self.simulation_parameters["r_new"] = q_opt["x7"]
+            self.simulation_parameters["r_new"] = q_opt["x3"] #q_opt["x7"]
             self.simulation_parameters["T_change_D"] = int(q_opt["x5"])
             self.simulation_parameters["Smooth_transition"] = 1 #int(q_opt["x9"])
             #S = int(q_opt["x5"])
@@ -259,7 +259,7 @@ class GP_PP_finder():
         plt.title(f"{country}, section {params_real['wave']}\n D = {self.simulation_parameters['D']}, r = {round(self.simulation_parameters['r'],4)}, N_init = {self.simulation_parameters['N_init']}, epsilon = {round(self.simulation_parameters['epsilon'],4)}")
 
         plt.legend()
-        plt.savefig(f"./Images_GP_fit/{country}_{params_real['wave']}_change.jpg")
+        plt.savefig(f"./Images_GP_fit/{country}_{params_real['wave']}_change_D.jpg")
         plt.close()
 
         #df_collect = pd.DataFrame((pandemic_parammeters, costs))
