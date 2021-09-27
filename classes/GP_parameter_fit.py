@@ -272,6 +272,8 @@ class GP_PP_finder():
 
         np.savetxt(f"./Images_GP_fit/{country}_{params_real['wave']}_pps.txt",pandemic_parammeters)
         np.savetxt(f"./Images_GP_fit/{country}_{params_real['wave']}_costs.txt",costs)
+        with open(f"./Images_GP_fit/{country}_{params_real['wave']}_simulation_parameters.json", 'w') as f:   
+            json.dump(self.simulation_parameters,f)
 
         return self.simulation_parameters
 

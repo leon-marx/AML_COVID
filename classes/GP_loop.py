@@ -4,7 +4,7 @@ import json
 with open("./classes/Countries/wave_regions.json","r") as file:
     waves = json.load(file)
 
-combinations = [['Germany', 1],['Sweden', 1], ['UnitedStates', 1]]
+combinations = [['Germany', 2],['UnitedStates', 2]]
 
 for comb in combinations:
     
@@ -22,5 +22,5 @@ for comb in combinations:
     }
 
     gp = GP_PP_finder(N_initial_PP_samples = 60,iterations = 240)
-#    gp = GP_PP_finder(N_initial_PP_samples = 2,iterations = 3)
+    #gp = GP_PP_finder(N_initial_PP_samples = 1,iterations = 1)
     gp(params_real, use_calibrated_values=True)
