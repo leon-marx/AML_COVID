@@ -10,24 +10,25 @@ import LSTM_Model
 
 # Fixed Parameters
 input_size = 1
-DATA_PATH = "data_path.pt"
-PP_PATH = "pp_path.pt"
+training_data_version = "v2"
+DATA_PATH = f"./trainingdata/{training_data_version}/data_{training_data_version}.pt" #"data_path.pt"
+PP_PATH = f"./trainingdata/{training_data_version}/pp_{training_data_version}.pt"
 device = "cuda" if torch.cuda.is_available() else "cpu"
 foretime = 3
 backtime = 20
-n_epochs = 1000
+n_epochs = 400 
 LOG_FOLDER = "Tuning_Logs"
-batch_length = 2500
+batch_length = 20000
 train_ratio = 0.7
-batch_size = 2048
+batch_size = 4096
 random_seed = 17
 
 # Parameters to Tune
-hidden_size_list = [128, 256, 512]
-num_layers_list = [1, 2]
+hidden_size_list = [256] # [256, 512]
+num_layers_list = [2] #[1, 2]
 dropout_list = [0.0, 0.5]
 nonlinearity_list = ["tanh", "relu"]
-learning_rate_list = [0.00001, 0.0001, 0.001, 0.01]
+learning_rate_list = [0.0001] #, 0.001, 0.01] #[0.00001, 0.0001, 0.001, 0.01]
 
 # Dataloader
 train_inds, test_inds = torch.utils.data.random_split(
@@ -117,6 +118,7 @@ def tune_lstm(hidden_size, num_layers, dropout, learning_rate):
         for X, X_PP, y in training_dataloader:
             train_loss = mylstm.train_model(training_X=X, training_PP=X_PP, training_y=y, loss_fn=loss_fn, optimizer=optimizer)
             t_loop.set_description(f"Epoch: {epoch}, Training Loss: {train_loss}")
+            train_losses.append(train_loss)
         if epoch % 100 == 0:
             test_losses = []
             for X_t, X_PP_t, y_t in test_dataloader:

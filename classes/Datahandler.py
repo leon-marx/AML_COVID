@@ -276,3 +276,92 @@ def compare_real_data_simulation(reps = 2,n = 1):
     plt.savefig(f"./compare_simulation_real_data_{params_real['file'].split('.')[0]}_{params_real['wave']}_{reps}_reps_{n}.jpg")
     plt.show()
 
+def compare_SIR_Simulation():
+    ############################################################################
+    #Case D = 8
+    ############################################################################
+    params_simulation = {'N': 1000, 'version': 'V2', 'd': 6, 'D': 8, 'r': 0.1, 'r_new': 0.05, 'D_new': 6, 'T_change_D': 1e6, 'Smooth_transition': 1, 'N_init': 10, 'T': 100, 'epsilon': 0.1}
+    params_SIR = {'N': 1000, 'T':params_simulation['T'], 'I0':params_simulation['N_init'], 'R0':params_simulation['N_init'], 'beta':params_simulation['r'] * params_simulation['D'] / params_simulation['N'],'gamma':1 / params_simulation['d']}
+
+    reps = 25
+
+    fs = 30
+
+    sum_sim_V2 = np.zeros(params_simulation['T'])
+    sum_sim_V3 = np.zeros(params_simulation['T'])
+    sum_SIR = np.zeros(params_simulation['T'])
+
+    for i in tqdm.tqdm( range(reps)):
+        DH_simulation_V2 = DataHandler("Simulation",params_simulation,device = "cpu")
+        ts_sim_V2,_ = DH_simulation_V2(None,None,return_plain=True)
+        sum_sim_V2 += ts_sim_V2.numpy()
+
+        DH_simulation_V3 = DataHandler("Simulation",params_simulation,device = "cpu")
+        ts_sim_V3,_ = DH_simulation_V3(None,None,return_plain=True)
+        sum_sim_V3 += ts_sim_V3.numpy()
+
+        DH_SIR = DataHandler("SIR",params_SIR,device = "cpu")
+        ts_SIR,_ = DH_SIR(None,None,return_plain=True)
+        sum_SIR += ts_SIR.numpy()
+
+    sum_sim_V2 /= reps
+    sum_sim_V3 /= reps
+    sum_SIR /= reps
+
+    plt.figure(figsize = (45,10))
+
+    plt.subplot(1,2,1)
+    plt.title("D = 8",fontsize = fs)
+    plt.xticks(fontsize = fs)
+    plt.yticks(fontsize = fs)
+
+    plt.xlabel("time [days]",fontsize = fs)
+    plt.ylabel("cumulative cases []",fontsize = fs)
+
+    plt.plot(sum_sim_V2,color = "b",label = "simulation, fixed degree",linewidth = 4)
+    plt.plot(sum_sim_V3,color = "r",label = "simulation, Poisson distributed degree",linewidth = 4)
+    plt.plot(sum_SIR,color = "y",label = "SIR",linewidth = 4)
+
+    plt.legend(fontsize = fs,loc = 4)
+
+    ############################################################################
+    #Case D = 3
+    ############################################################################
+    params_simulation = {'N': 1000, 'version': 'V2', 'd': 6, 'D': 3, 'r': 0.1, 'r_new': 0.05, 'D_new': 6, 'T_change_D': 1e6, 'Smooth_transition': 1, 'N_init': 10, 'T': 100, 'epsilon': 0.1}
+    params_SIR = {'N': 1000, 'T':params_simulation['T'], 'I0':params_simulation['N_init'], 'R0':params_simulation['N_init'], 'beta':params_simulation['r'] * params_simulation['D'] / params_simulation['N'],'gamma':1 / params_simulation['d']}
+
+    sum_sim_V2 = np.zeros(params_simulation['T'])
+    sum_sim_V3 = np.zeros(params_simulation['T'])
+    sum_SIR = np.zeros(params_simulation['T'])
+
+    for i in tqdm.tqdm( range(reps)):
+        DH_simulation_V2 = DataHandler("Simulation",params_simulation,device = "cpu")
+        ts_sim_V2,_ = DH_simulation_V2(None,None,return_plain=True)
+        sum_sim_V2 += ts_sim_V2.numpy()
+
+        DH_simulation_V3 = DataHandler("Simulation",params_simulation,device = "cpu")
+        ts_sim_V3,_ = DH_simulation_V3(None,None,return_plain=True)
+        sum_sim_V3 += ts_sim_V3.numpy()
+
+        DH_SIR = DataHandler("SIR",params_SIR,device = "cpu")
+        ts_SIR,_ = DH_SIR(None,None,return_plain=True)
+        sum_SIR += ts_SIR.numpy()
+
+    sum_sim_V2 /= reps
+    sum_sim_V3 /= reps
+    sum_SIR /= reps
+
+    plt.subplot(1,2,2)
+    plt.title("D = 3",fontsize = fs)
+    plt.xticks(fontsize = fs)
+    plt.yticks(fontsize = fs)
+
+    plt.xlabel("time [days]",fontsize = fs)
+    plt.ylabel("cumulative cases []",fontsize = fs)
+
+    plt.plot(sum_sim_V2,color = "b",label = "simulation, fixed degree",linewidth = 4)
+    plt.plot(sum_sim_V3,color = "r",label = "simulation, Poisson distributed degree",linewidth = 4)
+    plt.plot(sum_SIR,color = "y",label = "SIR",linewidth = 4)
+
+    plt.legend(fontsize = fs,loc = 4)
+    plt.savefig(f"compare_simulation_SIR_reps_{reps}.jpg")
