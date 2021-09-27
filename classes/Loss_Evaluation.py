@@ -41,37 +41,30 @@ def get_losses(old_only=False):
     names = []
     losses = []
     for filename in os.listdir(directory):
-        if filename[-4:] != ".txt":
-            if "Best" in filename:
+        if "comparison" in filename:
+            continue
+        if old_only:
+            if "foretime" in filename:
                 continue
-            if "NN_PP_" in filename:
-                continue
-            if "plot" in filename:
-                continue
-            if "comparison" in filename:
-                continue
-            if old_only:
-                if "foretime" in filename:
-                    continue
-            data = filename.split("-")
-            name = data[0]
-            hidden_size = int(data[1][-3:])
-            num_layers = int(data[2][-1])
-            if name == "RNN_Model":
-                nonlinearity = data[3][13:]
-                model = RNN_Model.RNN(input_size=1, hidden_size=hidden_size, num_layers=num_layers, nonlinearity=nonlinearity)
-            else:
-                dropout = float(data[3][8:])
-                model = LSTM_Model.LSTM(input_size=1, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
-            model.load_model(directory+filename)
-            model.to(device)
-            loss = []
-            for X, PP, y in test_dataloader:
-                test_loss = model.test_model(test_X=X, test_PP=PP, test_y=y, loss_fn=loss_fn, n_days=foretime)
-                loss.append(test_loss)
-                break
-            names.append(filename)
-            losses.append(np.mean(loss))
+        data = filename.split("-")
+        name = data[0]
+        hidden_size = int(data[1][-3:])
+        num_layers = int(data[2][-1])
+        if name == "RNN_Model":
+            nonlinearity = data[3][13:]
+            model = RNN_Model.RNN(input_size=1, hidden_size=hidden_size, num_layers=num_layers, nonlinearity=nonlinearity)
+        else:
+            dropout = float(data[3][8:])
+            model = LSTM_Model.LSTM(input_size=1, hidden_size=hidden_size, num_layers=num_layers, dropout=dropout)
+        model.load_model(directory+filename)
+        model.to(device)
+        loss = []
+        for X, PP, y in test_dataloader:
+            test_loss = model.test_model(test_X=X, test_PP=PP, test_y=y, loss_fn=loss_fn, n_days=foretime)
+            loss.append(test_loss)
+            break
+        names.append(filename)
+        losses.append(np.mean(loss))
     return names, losses
 
 def plot_predictions(filename, many=False, length=foretime):
@@ -416,7 +409,6 @@ def run_PP_fit(filename):
     fitting_PP, fitting_loss = model.apply_PP_fit(fit_data.view(fit_data.shape[0], 1, 1).type(torch.float32), PP_min, PP_max, PP_step, loss_fn)
     torch.save(fitting_PP, directory + "NN_PP_fit/fitted_PPs_" + name)
     torch.save(fitting_loss, directory + "NN_PP_fit/fitting_loss_" + name)
-
 
 names, losses = get_losses(old_only=False)
 run_comparison(names, losses)
